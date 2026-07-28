@@ -1,1627 +1,2134 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StockBuddy - Your AI-Powered Companion for Smarter Stock Predictions</title>
+  <title>StockBuddy — Market Regime & Risk Intelligence</title>
+  <meta name="description" content="StockBuddy uses unsupervised machine learning to classify market regimes and compute real-time risk condition scores — turning raw market data into actionable intelligence.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --cyan:    #00ffe0;
+      --green:   #00ff88;
+      --red:     #ff3366;
+      --amber:   #ffaa00;
+      --blue:    #00aaff;
+      --orange:  #ff6600;
+      --bg:      #080c10;
+      --bg2:     #0d1117;
+      --bg3:     #111820;
+      --border:  rgba(0,255,224,0.12);
+      --text:    #e2e8f0;
+      --muted:   #8892a4;
     }
+
+    body.light-mode {
+      --cyan:    #0284c7;
+      --green:   #16a34a;
+      --red:     #dc2626;
+      --amber:   #d97706;
+      --blue:    #2563eb;
+      --orange:  #ea580c;
+      --bg:      #f8fafc;
+      --bg2:     #ffffff;
+      --bg3:     #f1f5f9;
+      --border:  rgba(14,165,233,0.18);
+      --text:    #1e293b;
+      --muted:   #64748b;
+    }
+
+    html { scroll-behavior: smooth; }
 
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0a0a0a;
-      color: #e0e0e0;
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
       overflow-x: hidden;
       line-height: 1.6;
+      transition: background-color .3s, color .3s;
     }
 
-    /* Navigation */
+    /* ── NAV ── */
     nav {
-      position: fixed;
-      top: 0;
-      width: 100%;
-      padding: 1.5rem 5%;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: rgba(10, 10, 10, 0.95);
-      backdrop-filter: blur(10px);
-      z-index: 1000;
-      border-bottom: 1px solid rgba(0, 255, 224, 0.1);
+      position: fixed; top: 0; width: 100%; z-index: 1000;
+      padding: 1.1rem 5%;
+      display: flex; justify-content: space-between; align-items: center;
+      background: rgba(8,12,16,0.92);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      transition: background .3s;
     }
-
-    .logo {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #00ffe0;
-      letter-spacing: -0.5px;
+    body.light-mode nav { background: rgba(255,255,255,0.92); }
+    body.light-mode .hero h1 {
+      background: linear-gradient(135deg, #0f172a 0%, #0284c7 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
-
-    .nav-links {
-      display: flex;
-      gap: 2.5rem;
-      list-style: none;
+    body.light-mode .section-title,
+    body.light-mode .pipe-step h3,
+    body.light-mode .faq-q {
+      color: #0f172a !important;
     }
-
+    body.light-mode .theme-toggle-btn {
+      background: rgba(2, 132, 199, 0.08);
+      border-color: rgba(2, 132, 199, 0.3);
+      color: #0284c7;
+    }
+    .logo { font-size: 1.35rem; font-weight: 800; color: var(--cyan); letter-spacing: -0.5px; }
+    .logo span { color: var(--text); font-weight: 400; }
+    .nav-links { display: flex; gap: 2rem; list-style: none; align-items: center; }
     .nav-links a {
-      color: #e0e0e0;
-      text-decoration: none;
-      font-size: 0.95rem;
-      transition: color 0.3s;
-      position: relative;
+      color: var(--muted); text-decoration: none; font-size: 0.9rem; font-weight: 500;
+      transition: color .25s; position: relative;
     }
-
     .nav-links a::after {
-      content: '';
-      position: absolute;
-      bottom: -5px;
-      left: 0;
-      width: 0;
-      height: 2px;
-      background: #00ffe0;
-      transition: width 0.3s;
+      content: ''; position: absolute; bottom: -4px; left: 0;
+      width: 0; height: 2px; background: var(--cyan); transition: width .25s;
+    }
+    .nav-links a:hover { color: var(--cyan); }
+    .nav-links a:hover::after { width: 100%; }
+
+    /* ── THEME TOGGLE BUTTON ── */
+    .theme-toggle-btn {
+      display: inline-flex; align-items: center; gap: .5rem;
+      background: rgba(0, 255, 224, 0.08); border: 1px solid var(--border);
+      border-radius: 999px; padding: .45rem 1rem; font-size: .82rem; font-weight: 600;
+      color: var(--cyan); cursor: pointer; transition: all .25s; font-family: inherit;
+    }
+    .theme-toggle-btn:hover {
+      transform: translateY(-1px); box-shadow: 0 0 16px rgba(0,255,224,0.2);
     }
 
-    .nav-links a:hover {
-      color: #00ffe0;
+    /* ── ENGINE EXPLORER INTERACTIVE ── */
+    .engine-explorer {
+      margin-top: 2.5rem; background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 16px; padding: 2rem; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.12);
     }
-
-    .nav-links a:hover::after {
-      width: 100%;
+    .explorer-tabs { display: flex; gap: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; flex-wrap: wrap; }
+    .tab-btn {
+      background: transparent; border: 1px solid transparent; color: var(--muted);
+      padding: .65rem 1.4rem; border-radius: 8px; font-weight: 600; font-size: .9rem;
+      cursor: pointer; transition: all .25s; font-family: inherit;
     }
+    .tab-btn:hover { color: var(--cyan); background: rgba(0,255,224,0.04); }
+    .tab-btn.active { background: rgba(0,255,224,0.1); color: var(--cyan); border-color: var(--border); }
+    .tab-pane { display: none; margin-top: 1.8rem; animation: fadeIn .4s ease; }
+    .tab-pane.active { display: block; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .pane-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 2rem; align-items: center; }
+    @media (max-width: 850px) { .pane-grid { grid-template-columns: 1fr; } }
+    .pane-text h3 { font-size: 1.4rem; color: var(--cyan); font-weight: 700; margin-bottom: .8rem; }
+    .pane-text p { font-size: .95rem; color: var(--muted); line-height: 1.7; margin-bottom: 1.2rem; }
+    .pane-list { list-style: none; display: flex; flex-direction: column; gap: .6rem; }
+    .pane-list li { font-size: .9rem; color: var(--text); display: flex; align-items: center; gap: .6rem; }
+    .pane-list li span { color: var(--green); font-weight: bold; }
+    .pane-visual { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem; position: relative; }
+    .code-badge { font-size: .7rem; text-transform: uppercase; color: var(--cyan); letter-spacing: .1em; margin-bottom: .6rem; font-weight: 700; }
+    .vector-preview { font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: var(--green); line-height: 1.6; white-space: pre-wrap; margin: 0; }
 
-    /* Hero Section */
+
+    /* ── HERO LIVE QUANT COMMAND STUDIO ── */
     .hero {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      padding: 0 5%;
-      overflow: hidden;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      position: relative; padding: 6.5rem 5% 4rem; overflow: hidden; background: var(--bg);
     }
-
-    .hero-bg {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      opacity: 0.15;
-      z-index: 0;
+    .hero-ticker-tape {
+      width: 100%; max-width: 1000px; background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 999px; padding: .45rem 1.4rem; display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1.8rem; z-index: 2; font-family: 'JetBrains Mono', monospace; font-size: .78rem; color: var(--muted);
+      overflow-x: hidden; white-space: nowrap; gap: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      scrollbar-width: none;
     }
+    .hero-ticker-tape::-webkit-scrollbar { display: none; }
 
-    .hero-content {
-      position: relative;
-      z-index: 1;
-      max-width: 1200px;
-      text-align: center;
+    .ticker-item { display: flex; align-items: center; gap: .5rem; }
+    .ticker-sym { color: var(--text); font-weight: 700; }
+    .ticker-up { color: var(--green); font-weight: 600; }
+    .ticker-down { color: #ff4757; font-weight: 600; }
+    .ticker-tag { background: var(--bg3); padding: .15rem .4rem; border-radius: 4px; font-size: .7rem; border: 1px solid var(--border); color: var(--cyan); }
+
+    .hero-badge-tag {
+      display: inline-flex; align-items: center; gap: .6rem;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; padding: .4rem .9rem; font-size: .76rem;
+      color: var(--cyan); margin-bottom: 1.8rem; letter-spacing: .06em; font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
     }
-
+    .hero-badge-tag .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 1.8s infinite; }
+    
     .hero h1 {
-      font-size: clamp(2.5rem, 6vw, 5rem);
-      font-weight: 800;
-      margin-bottom: 1.5rem;
-      line-height: 1.1;
-      background: linear-gradient(135deg, #ffffff 0%, #00ffe0 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      animation: fadeInUp 1s ease-out;
+      font-size: clamp(2.5rem, 5.5vw, 4.6rem); font-weight: 900; line-height: 1.1;
+      margin-bottom: 1.4rem; text-align: center; color: var(--text);
+      letter-spacing: -.02em;
+    }
+    .hero-gradient-text {
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--green) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    
+    .hero-sub {
+      font-size: clamp(1rem, 1.8vw, 1.12rem); color: var(--muted);
+      max-width: 760px; margin: 0 auto 2.2rem; text-align: center; line-height: 1.7;
     }
 
-    .hero p {
-      font-size: clamp(1rem, 2vw, 1.3rem);
-      color: #b0b0b0;
-      max-width: 800px;
-      margin: 0 auto 3rem;
-      animation: fadeInUp 1s ease-out 0.2s backwards;
+    /* Hero Live Quick-Runner Bar */
+    .hero-quick-runner {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+      padding: 1rem 1.2rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+      justify-content: space-between; max-width: 820px; width: 100%; margin: 0 auto 2.8rem; z-index: 2;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15); transition: border-color .3s;
     }
-
-    .cta-buttons {
-      display: flex;
-      gap: 1.5rem;
-      justify-content: center;
-      flex-wrap: wrap;
-      animation: fadeInUp 1s ease-out 0.4s backwards;
+    .hero-quick-runner:focus-within { border-color: var(--cyan); box-shadow: 0 0 25px rgba(0,255,224,0.15); }
+    .hero-input-group { display: flex; align-items: center; gap: .6rem; flex: 1; min-width: 220px; }
+    .hero-input-group label { font-family: 'JetBrains Mono', monospace; font-size: .78rem; font-weight: 700; color: var(--cyan); white-space: nowrap; }
+    .hero-input-group input {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); padding: .65rem .9rem; font-size: .95rem; font-family: 'JetBrains Mono', monospace;
+      width: 100%; outline: none; transition: border-color .2s; text-transform: uppercase;
     }
-
-    .btn {
-      padding: 1rem 2.5rem;
-      font-size: 1rem;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: all 0.3s;
-      text-decoration: none;
-      display: inline-block;
-      border-radius: 8px;
+    .hero-input-group input:focus { border-color: var(--cyan); }
+    
+    .hero-chip-row { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+    .hero-chip {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 6px;
+      padding: .4rem .7rem; font-size: .76rem; font-family: 'JetBrains Mono', monospace;
+      color: var(--muted); cursor: pointer; transition: all .2s; font-weight: 600;
     }
+    .hero-chip:hover { border-color: var(--cyan); color: var(--cyan); }
 
-    .btn-primary {
-      background: #00ffe0;
-      color: #0a0a0a;
-      box-shadow: 0 0 30px rgba(0, 255, 224, 0.3);
+    .hero-run-btn {
+      background: var(--cyan); color: #080c10; border: none; border-radius: 8px;
+      padding: .7rem 1.6rem; font-size: .92rem; font-weight: 700; cursor: pointer;
+      font-family: inherit; transition: all .25s ease; white-space: nowrap; text-decoration: none;
+      display: inline-flex; align-items: center; gap: .4rem;
     }
+    .hero-run-btn:hover { box-shadow: 0 0 25px rgba(0,255,224,0.4); transform: translateY(-2px); }
 
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 0 40px rgba(0, 255, 224, 0.5);
+    /* Glassmorphic Stats Strip */
+    .hero-stats-strip {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2rem;
+      width: 100%; max-width: 1000px; margin-top: .5rem; z-index: 2;
     }
-
-    .btn-secondary {
-      background: transparent;
-      color: #00ffe0;
-      border: 2px solid #00ffe0;
+    @media (max-width: 850px) { .hero-stats-strip { grid-template-columns: repeat(2, 1fr); } }
+    .hero-stat-node {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+      padding: 1.1rem 1.3rem; display: flex; flex-direction: column; gap: .3rem; text-align: left;
     }
+    .hero-stat-val { font-size: 1.35rem; font-weight: 800; color: var(--cyan); font-family: 'JetBrains Mono', monospace; }
+    .hero-stat-lbl { font-size: .8rem; font-weight: 700; color: var(--text); }
+    .hero-stat-sub { font-size: .72rem; color: var(--muted); }
 
-    .btn-secondary:hover {
-      background: rgba(0, 255, 224, 0.1);
-      transform: translateY(-2px);
+
+    /* ── SECTION SHARED ── */
+    section { padding: 7rem 5%; }
+    .section-label {
+      display: inline-block; font-size: .75rem; font-weight: 600; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--cyan); margin-bottom: .8rem;
     }
+    .section-title { font-size: clamp(1.8rem, 3.5vw, 2.8rem); font-weight: 700; color: #fff; margin-bottom: 1rem; }
+    .section-sub   { font-size: 1.05rem; color: var(--muted); max-width: 680px; line-height: 1.75; }
 
-    .stats-bar {
-      display: flex;
-      justify-content: center;
-      gap: 4rem;
-      margin-top: 4rem;
-      padding-top: 3rem;
-      border-top: 1px solid rgba(0, 255, 224, 0.2);
-      animation: fadeInUp 1s ease-out 0.6s backwards;
+    /* ── FEATURES ── */
+    .features { background: var(--bg); }
+    .features-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem; margin-top: 3.5rem;
     }
-
-    .stat {
-      text-align: center;
+    .feature-card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+      padding: 2rem; transition: all .3s;
     }
-
-    .stat-value {
-      font-size: 2rem;
-      font-weight: 700;
-      color: #00ffe0;
-      display: block;
+    .feature-card:hover {
+      border-color: rgba(0,255,224,.35);
+      box-shadow: 0 8px 40px rgba(0,255,224,.08);
+      transform: translateY(-4px);
     }
-
-    .stat-label {
-      font-size: 0.9rem;
-      color: #888;
-      margin-top: 0.5rem;
+    .feature-icon {
+      width: 46px; height: 46px; border-radius: 10px;
+      background: rgba(0,255,224,.1); display: flex; align-items: center;
+      justify-content: center; font-size: 1.4rem; margin-bottom: 1.2rem;
     }
+    .feature-card h3 { font-size: 1.1rem; font-weight: 600; color: #fff; margin-bottom: .6rem; }
+    .feature-card p  { font-size: .92rem; color: var(--muted); line-height: 1.7; }
 
-    /* Features Section */
-    .features {
-      padding: 8rem 5%;
+    /* ── PIPELINE TERMINAL INSPECTOR (ZERO CARDS) ── */
+    .pipeline-section { background: var(--bg2); }
+    .pipeline-console {
+      display: grid; grid-template-columns: 320px 1fr; gap: 2rem;
+      margin-top: 2.5rem; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 16px; padding: 1.5rem; box-shadow: 0 12px 40px rgba(0,0,0,0.2);
     }
-
-    .feature {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 5rem;
-      margin-bottom: 8rem;
-      align-items: center;
+    @media (max-width: 850px) { .pipeline-console { grid-template-columns: 1fr; } }
+    
+    .pipeline-stepper {
+      display: flex; flex-direction: column; gap: .4rem; position: relative;
     }
-
-    .feature:nth-child(even) {
-      direction: rtl;
+    .pipeline-stepper::before {
+      content: ''; position: absolute; left: 19px; top: 20px; bottom: 20px;
+      width: 2px; background: var(--border); z-index: 0;
     }
-
-    .feature:nth-child(even)>* {
-      direction: ltr;
+    .step-node {
+      display: flex; align-items: center; gap: 1rem; padding: .7rem .9rem;
+      border-radius: 10px; cursor: pointer; transition: all .25s;
+      position: relative; z-index: 1; border: 1px solid transparent;
     }
-
-    .feature-content h2 {
-      font-size: clamp(2rem, 4vw, 3rem);
-      margin-bottom: 1.5rem;
-      color: #ffffff;
+    .step-node:hover { background: rgba(0,255,224,0.04); }
+    .step-node.active {
+      background: var(--bg2); border-color: var(--border);
+      box-shadow: 0 4px 20px rgba(0,255,224,0.08);
     }
-
-    .feature-content p {
-      font-size: 1.1rem;
-      color: #b0b0b0;
-      line-height: 1.8;
+    .node-bullet {
+      width: 38px; height: 38px; border-radius: 50%; background: var(--bg3);
+      border: 2px solid var(--border); color: var(--muted); font-size: .8rem;
+      font-weight: 800; display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace; flex-shrink: 0; transition: all .25s;
     }
-
-    .feature-visual {
-      background: rgba(0, 255, 224, 0.05);
-      border: 1px solid rgba(0, 255, 224, 0.2);
-      border-radius: 12px;
-      padding: 3rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 300px;
-      position: relative;
-      overflow: hidden;
+    .step-node.active .node-bullet {
+      background: var(--cyan); color: #080c10; border-color: var(--cyan);
+      box-shadow: 0 0 16px rgba(0,255,224,0.4);
     }
+    .node-info { display: flex; flex-direction: column; }
+    .node-title { font-size: .9rem; font-weight: 700; color: var(--text); }
+    .step-node.active .node-title { color: var(--cyan); }
+    .node-sub { font-size: .74rem; color: var(--muted); }
 
-    .feature-visual::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(0, 255, 224, 0.1), transparent);
-      transition: left 0.5s;
+    .pipeline-inspector {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+      overflow: hidden; display: flex; flex-direction: column;
     }
-
-    .feature:hover .feature-visual::before {
-      left: 100%;
+    .inspector-header {
+      background: var(--bg3); border-bottom: 1px solid var(--border);
+      padding: .8rem 1.2rem; display: flex; align-items: center; gap: 1rem;
     }
-
-    /* Architecture Section */
-    .architecture {
-      padding: 8rem 5%;
-      background: linear-gradient(180deg, #0a0a0a 0%, #0d1117 100%);
-    }
-
-    .architecture h2 {
-      text-align: center;
-      font-size: clamp(2rem, 4vw, 3rem);
-      margin-bottom: 4rem;
-      color: #ffffff;
-    }
-
-    .pipeline {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      max-width: 1200px;
-      margin: 0 auto;
-      position: relative;
-    }
-
-    .pipeline::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 0;
-      width: 100%;
-      height: 2px;
-      background: linear-gradient(90deg, #00ffe0, #00ff88);
-      transform: translateY(-50%);
-      z-index: 0;
-    }
-
-    .pipeline-step {
-      background: #0a0a0a;
-      border: 2px solid #00ffe0;
-      border-radius: 8px;
-      padding: 1.5rem;
-      text-align: center;
-      position: relative;
-      z-index: 1;
-      min-width: 150px;
-      transition: all 0.3s;
-    }
-
-    .pipeline-step:hover {
-      transform: translateY(-10px);
-      box-shadow: 0 10px 40px rgba(0, 255, 224, 0.3);
-    }
-
-    .pipeline-step h3 {
-      font-size: 0.9rem;
-      color: #00ffe0;
-      margin-bottom: 0.5rem;
-    }
-
-    .pipeline-step p {
-      font-size: 0.8rem;
-      color: #888;
-    }
-
-    /* Demo Section */
-    .demo {
-      padding: 8rem 5%;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
-    .demo h2 {
-      text-align: center;
-      font-size: clamp(2rem, 4vw, 3rem);
-      margin-bottom: 3rem;
-      color: #ffffff;
-    }
-
-    .demo-container {
-      background: rgba(0, 255, 224, 0.03);
-      border: 1px solid rgba(0, 255, 224, 0.2);
-      border-radius: 12px;
-      padding: 3rem;
-      position: relative;
-    }
-
-    .demo-controls {
-      display: flex;
-      gap: 2rem;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-    }
-
-    .control-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .control-group label {
-      font-size: 0.9rem;
-      color: #00ffe0;
-    }
-
-    .control-group select {
-      background: #0a0a0a;
-      border: 1px solid #00ffe0;
-      border-radius: 4px;
-      color: #e0e0e0;
-      padding: 0.75rem 1rem;
-      font-size: 1rem;
-      cursor: pointer;
-    }
-
-    .chart-container {
-      background: #0a0a0a;
-      border-radius: 8px;
-      padding: 2rem;
-      min-height: 400px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* Predict Section */
-    .predict {
-      padding: 8rem 5%;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
-    .predict h2 {
-      text-align: center;
-      font-size: clamp(2rem, 4vw, 3rem);
+    .window-dots { display: flex; gap: .4rem; }
+    .window-dots span { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-red { background: #ff5f56; }
+    .dot-yellow { background: #ffbd2e; }
+    .dot-green { background: #27c93f; }
+    .inspector-title { font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: var(--muted); }
+    .inspector-body { padding: 1.8rem; }
+    .inspector-badge {
+      display: inline-block; font-size: .72rem; font-weight: 700; color: var(--cyan);
+      background: rgba(0,255,224,0.08); border: 1px solid var(--border);
+      padding: .3rem .8rem; border-radius: 999px; text-transform: uppercase; letter-spacing: .08em;
       margin-bottom: 1rem;
-      color: #ffffff;
+    }
+    .inspector-body h3 { font-size: 1.3rem; color: var(--text); font-weight: 700; margin-bottom: .6rem; }
+    .inspector-body p { font-size: .92rem; color: var(--muted); line-height: 1.7; margin-bottom: 1.4rem; }
+
+    /* Visual Data Flow & Specs Inspector (NO CODE) */
+    .data-flow-box {
+      display: flex; align-items: center; justify-content: space-between; gap: .8rem;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+      padding: 1rem 1.2rem; margin-bottom: 1.5rem;
+    }
+    @media (max-width: 600px) { .data-flow-box { flex-direction: column; text-align: center; } .flow-arrow { transform: rotate(90deg); } }
+    .flow-step { display: flex; flex-direction: column; gap: .2rem; }
+    .flow-label { font-size: .68rem; font-weight: 800; color: var(--cyan); letter-spacing: .08em; }
+    .flow-step strong { font-size: .88rem; color: var(--text); }
+    .flow-arrow { color: var(--cyan); font-weight: bold; opacity: .7; }
+
+    .params-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    .param-card {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+      padding: .8rem 1rem; display: flex; flex-direction: column; gap: .2rem;
+    }
+    .param-key { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .param-val { font-size: .88rem; color: var(--green); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+    /* Quick Range Shortcut Pills */
+    .range-pills { display: flex; gap: .3rem; }
+    .pill-btn {
+      background: var(--bg3); border: 1px solid var(--border); color: var(--muted);
+      font-size: .72rem; font-weight: 700; padding: .35rem .65rem; border-radius: 6px;
+      cursor: pointer; transition: all .2s; font-family: 'JetBrains Mono', monospace;
+    }
+    .pill-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+    .pill-btn.active { background: rgba(0,255,224,0.12); border-color: var(--cyan); color: var(--cyan); }
+
+
+
+
+
+    /* ── SCROLL REVEAL & MICRO-ANIMATIONS ── */
+    .reveal {
+      opacity: 0; transform: translateY(28px);
+      transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: opacity, transform;
+    }
+    .reveal.reveal-visible { opacity: 1; transform: translateY(0); }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+
+    /* ── REGIME INTELLIGENCE SECTION ── */
+    .regime-section { background: var(--bg); }
+
+    /* Command Console Container (Zero Empty Canvas) */
+    .regime-command-console {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+      overflow: hidden; margin-top: 2.2rem; margin-bottom: 2rem;
+      box-shadow: 0 12px 35px rgba(0,0,0,0.1); transition: border-color .3s;
+    }
+    .regime-console-bar {
+      background: var(--bg3); padding: .65rem 1.4rem; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; font-family: 'JetBrains Mono', monospace;
+      font-size: .74rem; color: var(--muted); flex-wrap: wrap; gap: .5rem;
+    }
+    .regime-console-status { display: flex; align-items: center; gap: .5rem; color: var(--cyan); font-weight: 600; }
+    .live-dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; box-shadow: 0 0 10px var(--green); animation: pulse 1.8s infinite; }
+
+    .regime-controls-body {
+      padding: 1.6rem 1.8rem; display: flex; gap: 1.5rem; align-items: flex-end; flex-wrap: wrap;
+    }
+    .field-group { display: flex; flex-direction: column; gap: .45rem; }
+    .field-group label { font-size: .78rem; color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+    .field-group input, .field-group select {
+      background: var(--bg); border: 1px solid rgba(0,255,224,.2);
+      border-radius: 7px; color: var(--text); padding: .65rem .9rem;
+      font-size: .92rem; font-family: inherit; outline: none; transition: all .25s;
+      min-width: 140px;
+    }
+    .field-group input:focus, .field-group select:focus { border-color: var(--cyan); box-shadow: 0 0 14px rgba(0,255,224,.25); }
+    #analyzeBtn {
+      background: var(--cyan); color: #080c10; border: none; border-radius: 7px;
+      padding: .7rem 1.8rem; font-size: .95rem; font-weight: 700; cursor: pointer;
+      transition: all .25s cubic-bezier(0.16, 1, 0.3, 1); white-space: nowrap; align-self: flex-end; height: 42px;
+    }
+    #analyzeBtn:hover { box-shadow: 0 0 28px rgba(0,255,224,.45); transform: translateY(-2px); }
+    #analyzeBtn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+
+    /* regime dashboard grid */
+    .regime-dashboard { display: none; }
+    .regime-top-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.2rem; margin-bottom: 1.5rem;
     }
 
-    .predict-container {
-      display: grid;
-      grid-template-columns: 1fr 1.5fr;
-      gap: 3rem;
-      margin-top: 3rem;
+    /* regime badge card */
+    .regime-badge-card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+      padding: 1.8rem; display: flex; flex-direction: column; gap: .6rem;
+    }
+    .regime-badge-card .card-label { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+    .regime-name-pill {
+      display: inline-block; padding: .5rem 1.2rem; border-radius: 999px;
+      font-size: 1.05rem; font-weight: 700; color: #080c10;
+    }
+    .regime-desc { font-size: .88rem; color: var(--muted); line-height: 1.6; }
+
+    /* risk score gauge */
+    .risk-card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+      padding: 1.8rem; display: flex; flex-direction: column; align-items: center; gap: .5rem;
+    }
+    .risk-card .card-label { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; align-self: flex-start; }
+    #gaugeCanvas { width: 160px !important; height: 90px !important; }
+    .risk-score-num { font-size: 2.2rem; font-weight: 800; }
+    .risk-score-sub  { font-size: .8rem; color: var(--muted); }
+
+    /* alert card */
+    .alert-card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+      padding: 1.8rem; display: flex; flex-direction: column; gap: .7rem;
+    }
+    .alert-card .card-label { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+    .alert-badge {
+      display: inline-flex; align-items: center; gap: .6rem;
+      padding: .6rem 1.1rem; border-radius: 8px; font-weight: 700; font-size: 1rem;
+    }
+    .alert-dot { width: 10px; height: 10px; border-radius: 50%; animation: pulse 2s infinite; }
+    .alert-desc { font-size: .86rem; color: var(--muted); line-height: 1.6; }
+
+    /* indicators row */
+    .indicators-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    .ind-card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+      padding: 1.2rem 1rem; text-align: center;
+    }
+    .ind-label { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .4rem; }
+    .ind-value { font-size: 1.5rem; font-weight: 700; color: var(--cyan); font-family: 'JetBrains Mono', monospace; }
+    .ind-status { font-size: .75rem; margin-top: .3rem; font-weight: 500; }
+
+    /* charts row */
+    .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 1.2rem; margin-bottom: 1.5rem; }
+    .chart-card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 1.5rem;
+    }
+    .chart-card h4 { font-size: .85rem; color: var(--cyan); font-weight: 600; margin-bottom: 1rem; letter-spacing: .04em; text-transform: uppercase; }
+
+    /* historical odds */
+    .odds-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .odds-card {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 10px;
+      padding: 1.2rem; text-align: center;
+    }
+    .odds-horizon { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .5rem; }
+    .odds-pct { font-size: 1.8rem; font-weight: 800; }
+    .odds-median { font-size: .82rem; color: var(--muted); margin-top: .3rem; }
+    .odds-count  { font-size: .72rem; color: var(--muted); margin-top: .2rem; opacity: .7; }
+
+    /* regime loading */
+    .regime-loading {
+      display: none; text-align: center; padding: 3rem;
+      color: var(--muted); font-size: .95rem;
+    }
+    .spinner {
+      width: 36px; height: 36px; border: 3px solid var(--border);
+      border-top-color: var(--cyan); border-radius: 50%;
+      animation: spin 1s linear infinite; margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── PREDICT (ADVANCED) ── */
+    /* ── DEEP LEARNING NEURAL SIGNAL STUDIO (ZERO CARDS) ── */
+    .predict-section { background: var(--bg2); }
+    .disclaimer {
+      background: rgba(255,170,0,.06); border: 1px solid rgba(255,170,0,.2);
+      border-radius: 8px; padding: .9rem 1.1rem; font-size: .85rem; color: #ffaa00;
+      margin-bottom: 1.5rem; line-height: 1.6;
+    }
+    body.light-mode .disclaimer {
+      background: rgba(217, 119, 6, 0.08); border-color: rgba(217, 119, 6, 0.3);
+      color: #92400e; font-weight: 500;
     }
 
-    .predict-form {
-      background: rgba(0, 255, 224, 0.03);
-      border: 1px solid rgba(0, 255, 224, 0.2);
-      border-radius: 12px;
-      padding: 2.5rem;
+    .nn-studio-toolbar {
+      display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+      padding: 1.2rem 1.5rem; margin-top: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 8px 30px rgba(0,0,0,0.15);
     }
-
-    .predict-form h3 {
-      color: #00ffe0;
-      margin-bottom: 2rem;
-      font-size: 1.5rem;
+    .nn-field { display: flex; flex-direction: column; gap: .35rem; }
+    .nn-field label { font-size: .75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+    .nn-field input, .nn-field select {
+      background: var(--bg2); border: 1px solid rgba(0,255,224,.2); border-radius: 6px;
+      color: var(--text); padding: .55rem .8rem; font-size: .88rem; font-family: inherit; outline: none;
     }
-
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-      margin-bottom: 1.5rem;
+    .nn-field input:focus, .nn-field select:focus { border-color: var(--cyan); }
+    .train-btn {
+      background: var(--cyan); color: #080c10; border: none; border-radius: 7px;
+      padding: .65rem 1.5rem; font-size: .9rem; font-weight: 700; cursor: pointer;
+      transition: all .25s; white-space: nowrap; align-self: flex-end; height: 38px;
     }
+    .train-btn:hover { box-shadow: 0 0 24px rgba(0,255,224,.4); transform: translateY(-1px); }
+    .train-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
-    .form-field {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
+    .progress-bar { width: 100%; height: 6px; background: rgba(0,255,224,.1); border-radius: 999px; margin-bottom: 1.2rem; overflow: hidden; display: none; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--cyan), var(--green)); width: 0; transition: width .4s ease; border-radius: 999px; }
+
+    .nn-workspace-console {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 14px;
+      overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.2);
     }
-
-    .form-field label {
-      font-size: 0.9rem;
-      color: #b0b0b0;
-      font-weight: 500;
+    .nn-console-header {
+      background: var(--bg3); padding: .75rem 1.2rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 1rem;
     }
+    .console-title { font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: var(--cyan); letter-spacing: .05em; }
 
-    .form-field input,
-    .form-field select {
-      background: #0a0a0a;
-      border: 1px solid rgba(0, 255, 224, 0.3);
-      border-radius: 6px;
-      color: #e0e0e0;
-      padding: 0.75rem;
-      font-size: 1rem;
-      transition: all 0.3s;
+    .nn-metrics-bar {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;
+      padding: 1.2rem 1.5rem; background: var(--bg2); border-bottom: 1px solid var(--border);
     }
+    @media (max-width: 750px) { .nn-metrics-bar { grid-template-columns: repeat(2, 1fr); } }
+    .nn-metric { display: flex; flex-direction: column; gap: .2rem; }
+    .nn-m-key { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .nn-m-val { font-size: 1.3rem; font-weight: 800; color: var(--green); font-family: 'JetBrains Mono', monospace; }
 
-    .form-field input:focus,
-    .form-field select:focus {
-      outline: none;
-      border-color: #00ffe0;
-      box-shadow: 0 0 0 3px rgba(0, 255, 224, 0.1);
-    }
-
-    .progress-bar {
-      width: 100%;
-      height: 8px;
-      background: rgba(0, 255, 224, 0.1);
-      border-radius: 999px;
-      margin-top: 1.5rem;
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #00ffe0, #00ff88);
-      width: 0%;
-      transition: width 0.3s ease;
-      border-radius: 999px;
-    }
-
+    .nn-studio-split { display: grid; grid-template-columns: 360px 1fr; gap: 1.5rem; padding: 1.5rem; }
+    @media (max-width: 900px) { .nn-studio-split { grid-template-columns: 1fr; } }
+    
+    .nn-left-pane { display: flex; flex-direction: column; gap: 1rem; }
+    .pane-header { font-size: .78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    
     .status-log {
-      margin-top: 1.5rem;
-      background: #0a0a0a;
-      border: 1px solid rgba(0, 255, 224, 0.2);
-      border-radius: 6px;
-      padding: 1rem;
-      max-height: 200px;
-      overflow-y: auto;
-      font-family: 'Courier New', monospace;
-      font-size: 0.85rem;
-      color: #00ff88;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; padding: .9rem; max-height: 180px; overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace; font-size: .76rem; color: var(--green);
     }
+    .status-log div { margin: .2rem 0; }
 
-    .status-log div {
-      margin: 0.25rem 0;
+    .nn-matrix-standby {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem; margin-top: .5rem;
     }
+    .standby-title { font-size: .8rem; font-weight: 700; color: var(--cyan); margin-bottom: .8rem; }
+    .standby-grid { display: flex; flex-direction: column; gap: .45rem; font-size: .8rem; }
+    .standby-grid span { color: var(--muted); }
+    .standby-grid strong { color: var(--text); font-family: 'JetBrains Mono', monospace; }
 
-    .predict-results {
-      background: rgba(0, 255, 224, 0.03);
-      border: 1px solid rgba(0, 255, 224, 0.2);
-      border-radius: 12px;
-      padding: 2.5rem;
+    .nn-right-pane { display: flex; flex-direction: column; gap: 1rem; }
+    .chart-wrapper { background: var(--bg2); border-radius: 8px; padding: 1rem; }
+    .future-table-wrap { background: var(--bg2); border-radius: 8px; padding: 1rem; margin-top: 1rem; }
+    .future-table-wrap h4 { font-size: .85rem; color: var(--cyan); margin-bottom: .8rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: .6rem .8rem; text-align: left; border-bottom: 1px solid var(--border); font-size: .88rem; }
+    th { color: var(--cyan); font-weight: 600; }
+    td { color: var(--text); }
+
+
+    /* ── HORIZONTAL INTERACTIVE EXECUTION CIRCUIT ── */
+    .how-section { background: var(--bg); }
+    .circuit-container {
+      margin-top: 2.2rem; display: flex; flex-direction: column; gap: 2rem;
     }
-
-    .predict-results h3 {
-      color: #00ffe0;
-      margin-bottom: 2rem;
-      font-size: 1.5rem;
+    
+    /* Horizontal Process Track Bar */
+    .circuit-track {
+      display: flex; align-items: center; justify-content: space-between;
+      position: relative; padding: 1rem 0; margin: 0 .5rem;
     }
-
-    .metrics-row {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1rem;
-      margin-bottom: 2rem;
+    .circuit-line {
+      position: absolute; top: 50%; left: 0; right: 0; height: 2px;
+      background: var(--border); z-index: 1; transform: translateY(-50%);
     }
-
-    .metric-box {
-      background: #0a0a0a;
-      border: 1px solid rgba(0, 255, 224, 0.2);
-      border-radius: 8px;
-      padding: 1.5rem;
-      text-align: center;
+    .circuit-line-progress {
+      position: absolute; top: 50%; left: 0; width: 16%; height: 2px;
+      background: var(--cyan); box-shadow: 0 0 12px var(--cyan); z-index: 2;
+      transform: translateY(-50%); transition: width .4s cubic-bezier(0.16, 1, 0.3, 1);
     }
-
-    .metric-label {
-      font-size: 0.85rem;
-      color: #888;
-      margin-bottom: 0.5rem;
+    
+    .circuit-node {
+      position: relative; z-index: 3; display: flex; flex-direction: column;
+      align-items: center; gap: .6rem; cursor: pointer; user-select: none;
     }
-
-    .metric-value {
-      font-size: 1.8rem;
-      font-weight: 700;
-      color: #00ffe0;
+    .circuit-node-dot {
+      width: 36px; height: 36px; border-radius: 50%; background: var(--bg2);
+      border: 2px solid var(--border); display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace; font-size: .8rem; font-weight: 700;
+      color: var(--muted); transition: all .3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-
-    .chart-wrapper {
-      background: #0a0a0a;
-      border-radius: 8px;
-      padding: 1.5rem;
-      margin-bottom: 2rem;
+    .circuit-node:hover .circuit-node-dot {
+      border-color: var(--cyan); color: var(--cyan); transform: scale(1.1);
     }
-
-    .future-predictions {
-      background: #0a0a0a;
-      border-radius: 8px;
-      padding: 1.5rem;
+    .circuit-node.active .circuit-node-dot {
+      background: var(--cyan); color: #080c10; border-color: var(--cyan);
+      box-shadow: 0 0 20px rgba(0,255,224,0.6); transform: scale(1.15);
     }
-
-    .future-predictions h4 {
-      color: #00ffe0;
-      margin-bottom: 1rem;
-      font-size: 1.2rem;
+    .circuit-node-label {
+      font-size: .75rem; font-weight: 700; color: var(--muted); text-transform: uppercase;
+      letter-spacing: .06em; font-family: 'JetBrains Mono', monospace; transition: color .3s;
+      white-space: nowrap;
     }
-
-    .future-predictions table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    .future-predictions th,
-    .future-predictions td {
-      padding: 0.75rem;
-      text-align: left;
-      border-bottom: 1px solid rgba(0, 255, 224, 0.1);
-    }
-
-    .future-predictions th {
-      color: #00ffe0;
-      font-weight: 600;
-    }
-
-    .future-predictions td {
-      color: #e0e0e0;
-    }
-
-    /* Tech Stack */
-    .tech-stack {
-      padding: 8rem 5%;
-      text-align: center;
-    }
-
-    .tech-stack h2 {
-      font-size: clamp(2rem, 4vw, 3rem);
-      margin-bottom: 4rem;
-      color: #ffffff;
-    }
-
-    .tech-grid {
-      display: flex;
-      justify-content: center;
-      gap: 3rem;
-      flex-wrap: wrap;
-      max-width: 1000px;
-      margin: 0 auto;
-    }
-
-    .tech-item {
-      font-size: 1.2rem;
-      color: #888;
-      padding: 1rem 2rem;
-      border: 1px solid rgba(0, 255, 224, 0.2);
-      border-radius: 8px;
-      transition: all 0.3s;
-      cursor: default;
-    }
-
-    .tech-item:hover {
-      color: #00ffe0;
-      border-color: #00ffe0;
-      box-shadow: 0 0 20px rgba(0, 255, 224, 0.2);
-    }
-
-    /* FAQ */
-    .faq {
-      padding: 8rem 5%;
-      max-width: 900px;
-      margin: 0 auto;
-    }
-
-    .faq h2 {
-      text-align: center;
-      font-size: clamp(2rem, 4vw, 3rem);
-      margin-bottom: 4rem;
-      color: #ffffff;
-    }
-
-    .faq-item {
-      border-bottom: 1px solid rgba(0, 255, 224, 0.1);
-      padding: 2rem 0;
-      cursor: pointer;
-    }
-
-    .faq-question {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 1.2rem;
-      font-weight: 600;
-      color: #ffffff;
-    }
-
-    .faq-question:hover {
-      color: #00ffe0;
-    }
-
-    .faq-answer {
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.3s ease;
-      color: #b0b0b0;
-      padding-top: 0;
-    }
-
-    .faq-item.active .faq-answer {
-      max-height: 500px;
-      padding-top: 1.5rem;
-    }
-
-    .faq-icon {
-      transition: transform 0.3s;
-    }
-
-    .faq-item.active .faq-icon {
-      transform: rotate(45deg);
-    }
-
-    /* Footer */
-    footer {
-      padding: 4rem 5%;
-      text-align: center;
-      border-top: 1px solid rgba(0, 255, 224, 0.1);
-      margin-top: 4rem;
-    }
-
-    footer p {
-      color: #888;
-      font-size: 0.9rem;
-    }
-
-    footer a {
-      color: #00ffe0;
-      text-decoration: none;
-      transition: opacity 0.3s;
-    }
-
-    footer a:hover {
-      opacity: 0.7;
-    }
-
-    /* Animations */
-    @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    @keyframes float {
-
-      0%,
-      100% {
-        transform: translateY(0);
-      }
-
-      50% {
-        transform: translateY(-20px);
-      }
-    }
-
-    /* Responsive */
+    .circuit-node.active .circuit-node-label { color: var(--cyan); }
     @media (max-width: 768px) {
-      .nav-links {
-        display: none;
-      }
-
-      .feature {
-        grid-template-columns: 1fr;
-        gap: 2rem;
-      }
-
-      .feature:nth-child(even) {
-        direction: ltr;
-      }
-
-      .pipeline {
-        flex-direction: column;
-        gap: 2rem;
-      }
-
-      .pipeline::before {
-        width: 2px;
-        height: 100%;
-        left: 50%;
-        top: 0;
-        background: linear-gradient(180deg, #00ffe0, #00ff88);
-      }
-
-      .stats-bar {
-        flex-direction: column;
-        gap: 2rem;
-      }
-
-      .predict-container {
-        grid-template-columns: 1fr;
-      }
-
-      .form-row {
-        grid-template-columns: 1fr;
-      }
-
-      .metrics-row {
-        grid-template-columns: repeat(2, 1fr);
-      }
+      .circuit-track { flex-direction: column; align-items: flex-start; gap: 1.2rem; }
+      .circuit-line, .circuit-line-progress { display: none; }
     }
 
-    /* Canvas for animated background */
-    #particles {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
+    /* Execution Detail Stage Display */
+    .circuit-display {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 16px;
+      padding: 2.2rem 2.6rem; display: flex; flex-direction: column; gap: 1.4rem;
+      position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+    }
+    .circuit-display-header {
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;
+    }
+    .circuit-event-badge {
+      font-family: 'JetBrains Mono', monospace; font-size: .78rem; font-weight: 700;
+      color: var(--cyan); background: var(--bg3); border: 1px solid var(--border);
+      padding: .4rem .9rem; border-radius: 6px;
+    }
+    .circuit-stage-title { font-size: 1.4rem; font-weight: 800; color: var(--text); margin: 0; }
+    .circuit-stage-desc { font-size: .96rem; color: var(--muted); line-height: 1.7; margin: 0; }
+    
+    .circuit-matrix-flow {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-top: .5rem;
+    }
+    @media (max-width: 800px) { .circuit-matrix-flow { grid-template-columns: 1fr; } }
+    .matrix-box {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem;
+      display: flex; flex-direction: column; gap: .4rem;
+    }
+    .matrix-box-label { font-size: .7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+    .matrix-box-val { font-size: .92rem; font-weight: 700; color: var(--text); font-family: 'JetBrains Mono', monospace; }
+
+
+
+
+    /* ── FAQ INTERACTIVE KNOWLEDGE STUDIO ── */
+    .faq-section { background: var(--bg2); }
+    .faq-wrap { max-width: 900px; margin-top: 2.2rem; display: flex; flex-direction: column; gap: 1rem; }
+    .faq-item {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+      overflow: hidden; transition: all .3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .faq-item:hover { border-color: rgba(0,255,224,0.4); box-shadow: 0 6px 20px rgba(0,0,0,0.06); transform: translateY(-2px); }
+    .faq-item.open { border-color: var(--cyan); box-shadow: 0 8px 30px rgba(0,255,224,0.12); }
+    
+    .faq-q {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1.2rem 1.6rem; cursor: pointer; font-size: 1.02rem; font-weight: 600; color: var(--text);
+      transition: color .2s; user-select: none;
+    }
+    .faq-q:hover { color: var(--cyan); }
+    .faq-icon {
+      width: 28px; height: 28px; border-radius: 50%; background: var(--bg2); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+      color: var(--cyan); transition: all .3s cubic-bezier(0.16, 1, 0.3, 1); flex-shrink: 0;
+    }
+    .faq-item.open .faq-icon { transform: rotate(45deg); background: rgba(0,255,224,0.15); border-color: var(--cyan); }
+    .faq-a {
+      max-height: 0; overflow: hidden; transition: max-height .4s cubic-bezier(0.16, 1, 0.3, 1), padding .4s ease;
+      color: var(--muted); font-size: .92rem; line-height: 1.75; padding: 0 1.6rem;
+    }
+    .faq-item.open .faq-a { max-height: 350px; padding: 0 1.6rem 1.4rem 1.6rem; border-top: 1px solid var(--border); }
+
+    /* ── INSTITUTIONAL STUDIO FOOTER ── */
+    footer.studio-footer {
+      background: var(--bg); border-top: 1px solid var(--border);
+      padding: 3.5rem 6% 2rem 6%; color: var(--muted); font-size: .88rem;
+    }
+    .footer-grid {
+      display: grid; grid-template-columns: 2fr 1.2fr 1.5fr; gap: 2.5rem; margin-bottom: 2.5rem;
+    }
+    @media (max-width: 850px) { .footer-grid { grid-template-columns: 1fr; gap: 1.8rem; } }
+    .footer-brand .footer-logo { font-size: 1.3rem; font-weight: 800; color: var(--text); display: flex; align-items: center; gap: .6rem; }
+    .footer-brand .footer-tagline { font-size: .85rem; color: var(--muted); margin-top: .6rem; line-height: 1.6; max-width: 380px; }
+    
+    .footer-title { font-size: .78rem; font-weight: 700; color: var(--cyan); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 1rem; }
+    .footer-links { display: flex; flex-direction: column; gap: .6rem; }
+    .footer-links a { color: var(--muted); text-decoration: none; transition: all .2s; font-size: .88rem; }
+    .footer-links a:hover { color: var(--cyan); transform: translateX(3px); }
+
+    .footer-status-box {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.2rem;
+      display: flex; flex-direction: column; gap: .65rem; font-family: 'JetBrains Mono', monospace; font-size: .76rem;
+    }
+    .status-item { display: flex; align-items: center; justify-content: space-between; }
+    .status-item span { color: var(--muted); }
+    .status-item strong { color: var(--green); }
+
+    .footer-bottom {
+      border-top: 1px solid var(--border); padding-top: 1.5rem; display: flex; justify-content: space-between;
+      align-items: center; flex-wrap: wrap; gap: 1rem; font-size: .82rem;
+    }
+    .footer-bottom a { color: var(--cyan); text-decoration: none; font-weight: 600; }
+    .footer-bottom a:hover { text-decoration: underline; }
+
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .regime-top-grid { grid-template-columns: 1fr; }
+      .indicators-row   { grid-template-columns: repeat(2,1fr); }
+      .charts-row       { grid-template-columns: 1fr; }
+      .odds-grid        { grid-template-columns: repeat(2,1fr); }
+      .predict-layout   { grid-template-columns: 1fr; }
+      .metrics-row      { grid-template-columns: repeat(2,1fr); }
+    }
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+      .stats-bar { flex-direction: column; gap: 1.5rem; }
+      .pipeline-row { gap: .3rem; }
+      .pipe-arrow { display: none; }
     }
   </style>
 </head>
-
 <body>
+  <!-- NAV -->
   <nav>
-    <div class="logo">StockBuddy</div>
+    <div class="logo">Stock<span>Buddy</span></div>
     <ul class="nav-links">
-      <li><a href="#features">Features</a></li>
-      <li><a href="#demo">Demo</a></li>
-      <li><a href="#predict">Predict</a></li>
-      <li><a href="#architecture">Architecture</a></li>
-      <li><a href="#tech">Technology</a></li>
+      <li><a href="#features">Architecture</a></li>
+      <li><a href="#regime">Regime Engine</a></li>
+      <li><a href="#predict">Deep Learning</a></li>
+      <li><a href="#how-it-works">How It Works</a></li>
       <li><a href="#faq">FAQ</a></li>
+      <li>
+        <button id="themeToggle" class="theme-toggle-btn">
+          <span id="themeIcon">🌙</span> <span id="themeText">Dark</span>
+        </button>
+      </li>
     </ul>
   </nav>
 
+  <!-- HERO LIVE QUANT COMMAND STUDIO -->
   <section class="hero">
-    <canvas id="particles" class="hero-bg"></canvas>
-    <div class="hero-content">
-      <h1>Predict the Market with Confidence</h1>
-      <p>StockBuddy combines LSTM, GRU, and Transformer architectures to forecast stock prices with precision and
-        reliability.</p>
-      <div class="cta-buttons">
-        <a href="#demo" class="btn btn-primary">Try Live Demo</a>
-        <a href="#architecture" class="btn btn-secondary">View Technical Docs</a>
+    <canvas id="particles"></canvas>
+    
+    <!-- Top Live Ticker Tape Ribbon -->
+    <div class="hero-ticker-tape">
+      <div class="ticker-item">
+        <span class="ticker-sym">AAPL</span> <span class="ticker-up">$224.30 ▲ +1.4%</span> <span class="ticker-tag">BULL RECOVERY</span>
       </div>
-      <div class="stats-bar">
-        <div class="stat">
-          <span class="stat-value">91.2%</span>
-          <span class="stat-label">Accuracy</span>
-        </div>
-        <div class="stat">
-          <span class="stat-value">Live Data</span>
-          <span class="stat-label">Real-Time Updates</span>
-        </div>
-        <div class="stat">
-          <span class="stat-value">Confidence</span>
-          <span class="stat-label">Intervals Included</span>
-        </div>
+      <div class="ticker-item">
+        <span class="ticker-sym">NVDA</span> <span class="ticker-up">$118.50 ▲ +2.8%</span> <span class="ticker-tag">TRENDING BULL</span>
+      </div>
+      <div class="ticker-item">
+        <span class="ticker-sym">TSLA</span> <span class="ticker-down">$248.20 ▼ -0.9%</span> <span class="ticker-tag">OVERBOUGHT</span>
+      </div>
+      <div class="ticker-item">
+        <span class="ticker-sym">SPY</span> <span class="ticker-up">$542.10 ▲ +0.4%</span> <span class="ticker-tag">NEUTRAL VOL</span>
+      </div>
+    </div>
+
+    <!-- Live Status Badge -->
+    <div class="hero-badge-tag">
+      <span class="dot"></span> LIVE ENGINE: YFINANCE API · K-MEANS k=6 · PYTORCH DL
+    </div>
+
+    <!-- Title & Subtitle -->
+    <h1>Understand Market Regimes.<br><span class="hero-gradient-text">Quantitative Intelligence, Zero Guesswork.</span></h1>
+    <p class="hero-sub">
+      StockBuddy combines unsupervised K-Means clustering, Cosine vector historical matching, and tactical allocation engines to classify market environments and surface verifiable historical odds.
+    </p>
+
+    <!-- Interactive Hero Quick-Runner Command Bar -->
+    <div class="hero-quick-runner">
+      <div class="hero-input-group">
+        <label>SYSTEM TICKER:</label>
+        <input type="text" id="heroTickerInput" value="AAPL" maxlength="6">
+      </div>
+      <div class="hero-chip-row">
+        <span class="hero-chip" onclick="quickHeroRun('AAPL')">AAPL</span>
+        <span class="hero-chip" onclick="quickHeroRun('NVDA')">NVDA</span>
+        <span class="hero-chip" onclick="quickHeroRun('TSLA')">TSLA</span>
+        <span class="hero-chip" onclick="quickHeroRun('SPY')">SPY</span>
+        <span class="hero-chip" onclick="quickHeroRun('QQQ')">QQQ</span>
+      </div>
+      <a href="#regime" class="hero-run-btn" onclick="executeHeroRun()">
+        RUN REGIME ENGINE →
+      </a>
+    </div>
+
+    <!-- Glassmorphic Stats Strip -->
+    <div class="hero-stats-strip">
+      <div class="hero-stat-node">
+        <div class="hero-stat-val">k = 6</div>
+        <div class="hero-stat-lbl">Market Regimes</div>
+        <div class="hero-stat-sub">Unsupervised K-Means</div>
+      </div>
+      <div class="hero-stat-node">
+        <div class="hero-stat-val">0 – 10</div>
+        <div class="hero-stat-lbl">Risk Composite Score</div>
+        <div class="hero-stat-sub">Rolling Volatility Smoothed</div>
+      </div>
+      <div class="hero-stat-node">
+        <div class="hero-stat-val">15Y+</div>
+        <div class="hero-stat-lbl">Vector Time-Travel</div>
+        <div class="hero-stat-sub">100% Genuine yfinance Data</div>
+      </div>
+      <div class="hero-stat-node">
+        <div class="hero-stat-val">&lt; 100ms</div>
+        <div class="hero-stat-lbl">Pipeline Latency</div>
+        <div class="hero-stat-sub">Flask REST Engine</div>
       </div>
     </div>
   </section>
 
+
+  <!-- INTERACTIVE SYSTEM EXPLORER -->
   <section class="features" id="features">
-    <div class="feature">
-      <div class="feature-content">
-        <h2>Deep Learning Models</h2>
-        <p>Harness the power of advanced neural architectures. Our ensemble combines LSTM for capturing long-term
-          dependencies, GRU for efficient processing, and Transformers for attention-based pattern recognition. Each
-          model brings unique strengths to deliver robust predictions.</p>
-      </div>
-      <div class="feature-visual">
-        <canvas id="neuralNetwork"></canvas>
-      </div>
-    </div>
+    <div class="section-label">Engine Architecture</div>
+    <h2 class="section-title">The Three Quantitative Pillars</h2>
+    <p class="section-sub">Instead of naive point-in-time price guesses, StockBuddy operates on statistically defensible quantitative pillars.</p>
 
-    <div class="feature">
-      <div class="feature-content">
-        <h2>Real-Time Market Data</h2>
-        <p>Stay ahead with live market feeds from Yahoo Finance API. StockBuddy processes real-time price movements,
-          volume data, and technical indicators to provide up-to-the-minute forecasts that adapt to market conditions.
-        </p>
-      </div>
-      <div class="feature-visual">
-        <div id="liveTicker" style="color: #00ffe0; font-size: 2rem; font-weight: 700;"></div>
-      </div>
-    </div>
-
-    <div class="feature">
-      <div class="feature-content">
-        <h2>Confidence Intervals</h2>
-        <p>Make informed decisions with uncertainty quantification. Every prediction includes confidence bands that show
-          the range of possible outcomes, helping you understand risk and make data-driven trading decisions.</p>
-      </div>
-      <div class="feature-visual">
-        <canvas id="confidenceBand"></canvas>
-      </div>
-    </div>
-  </section>
-
-  <section class="architecture" id="architecture">
-    <h2>Architecture Overview</h2>
-    <div class="pipeline">
-      <div class="pipeline-step">
-        <h3>Input</h3>
-        <p>Ticker Symbol</p>
-      </div>
-      <div class="pipeline-step">
-        <h3>Data Pipeline</h3>
-        <p>Yahoo Finance</p>
-      </div>
-      <div class="pipeline-step">
-        <h3>Features</h3>
-        <p>Engineering</p>
-      </div>
-      <div class="pipeline-step">
-        <h3>Models</h3>
-        <p>LSTM/GRU/Transformer</p>
-      </div>
-      <div class="pipeline-step">
-        <h3>Predictions</h3>
-        <p>Forecasts</p>
-      </div>
-      <div class="pipeline-step">
-        <h3>Output</h3>
-        <p>Visualization</p>
-      </div>
-    </div>
-  </section>
-
-  <section class="demo" id="demo">
-    <h2>Live Demo</h2>
-    <div class="demo-container">
-      <div class="demo-controls">
-        <div class="control-group">
-          <label>Select Stock</label>
-          <select id="stockSelect">
-            <option value="AAPL">AAPL - Apple Inc.</option>
-            <option value="TSLA">TSLA - Tesla Inc.</option>
-            <option value="GOOGL">GOOGL - Alphabet Inc.</option>
-            <option value="MSFT">MSFT - Microsoft</option>
-            <option value="NVDA">NVDA - NVIDIA</option>
-          </select>
-        </div>
-        <div class="control-group">
-          <label>Forecast Horizon</label>
-          <select id="horizonSelect">
-            <option value="7">7 Days</option>
-            <option value="14">14 Days</option>
-            <option value="30" selected>30 Days</option>
-          </select>
-        </div>
-        <div class="control-group">
-          <label>Model Type</label>
-          <select id="modelSelect">
-            <option value="LSTM">LSTM</option>
-            <option value="GRU">GRU</option>
-            <option value="Transformer">Transformer</option>
-            <option value="Ensemble" selected>Ensemble</option>
-          </select>
-        </div>
-      </div>
-      <div class="chart-container">
-        <canvas id="demoChart"></canvas>
-      </div>
-    </div>
-  </section>
-
-  <section class="predict" id="predict">
-    <h2>Live Prediction Engine</h2>
-    <p style="text-align: center; color: #b0b0b0; max-width: 800px; margin: 0 auto 3rem;">Train AI models on real market
-      data and get predictions with confidence intervals</p>
-
-    <div class="predict-container">
-      <div class="predict-form">
-        <h3>Configure Prediction</h3>
-
-        <div class="form-row">
-          <div class="form-field">
-            <label for="predTicker">Stock Ticker</label>
-            <input type="text" id="predTicker" placeholder="AAPL" value="AAPL">
-          </div>
-
-          <div class="form-field">
-            <label for="predModel">AI Model</label>
-            <select id="predModel">
-              <option value="LSTM">LSTM - Long Short-Term Memory</option>
-              <option value="GRU">GRU - Gated Recurrent Unit</option>
-              <option value="Transformer">Transformer - Attention Based</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-field">
-            <label for="predStartDate">Start Date</label>
-            <input type="date" id="predStartDate" value="2020-01-01">
-          </div>
-
-          <div class="form-field">
-            <label for="predEndDate">End Date</label>
-            <input type="date" id="predEndDate">
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-field">
-            <label for="predSequence">Sequence Length</label>
-            <input type="number" id="predSequence" value="90" min="30" max="365">
-          </div>
-
-          <div class="form-field">
-            <label for="predEpochs">Training Epochs</label>
-            <input type="number" id="predEpochs" value="20" min="5" max="100">
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-field">
-            <label for="predBatch">Batch Size</label>
-            <input type="number" id="predBatch" value="16" min="8" max="128" step="8">
-          </div>
-
-          <div class="form-field">
-            <label for="predFuture">Future Days</label>
-            <input type="number" id="predFuture" value="5" min="1" max="60">
-          </div>
-        </div>
-
-        <button class="btn btn-primary" id="predictBtn" style="width: 100%; margin-top: 1rem;">
-          <span id="predictBtnText">Train & Predict</span>
+    <div class="engine-explorer">
+      <div class="explorer-tabs">
+        <button class="tab-btn active" onclick="switchTab('clustering')">
+          <span class="tab-icon">🧬</span> 01. Unsupervised Clustering
         </button>
-
-        <div class="progress-bar" id="predProgress" style="display: none;">
-          <div class="progress-fill" id="predProgressFill"></div>
-        </div>
-
-        <div class="status-log" id="statusLog" style="display: none;"></div>
+        <button class="tab-btn" onclick="switchTab('vector')">
+          <span class="tab-icon">🔍</span> 02. Vector Cosine Similarity
+        </button>
+        <button class="tab-btn" onclick="switchTab('tactical')">
+          <span class="tab-icon">🛡️</span> 03. Tactical Risk Gatekeeper
+        </button>
       </div>
 
-      <div class="predict-results" id="predictResults" style="display: none;">
-        <h3>Prediction Results</h3>
-
-        <div class="metrics-row">
-          <div class="metric-box">
-            <div class="metric-label">RMSE</div>
-            <div class="metric-value" id="metricRMSE">-</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">MAE</div>
-            <div class="metric-value" id="metricMAE">-</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Directional Accuracy</div>
-            <div class="metric-value" id="metricDA">-</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Sharpe Ratio</div>
-            <div class="metric-value" id="metricSharpe">-</div>
+      <div class="explorer-content">
+        <!-- TAB 1: CLUSTERING -->
+        <div id="tab-clustering" class="tab-pane active">
+          <div class="pane-grid">
+            <div class="pane-text">
+              <h3>K-Means Feature Clustering (6 Regimes)</h3>
+              <p>Financial markets continuously shift between volatility regimes and structural trends. We map each trading day into a 5-dimensional feature space (RSI, EMA slope, MACD hist, Volatility, 10d Return) and apply K-Means clustering.</p>
+              <ul class="pane-list">
+                <li><span>✓</span> <b>No Hard-Coded Rules:</b> Regimes emerge naturally from mathematical cluster distance.</li>
+                <li><span>✓</span> <b>6 Semantic States:</b> Ranging from Trending Bull (0) to High Volatility Stress (5).</li>
+                <li><span>✓</span> <b>Noise-Resistant:</b> Captures multi-indicator momentum & volatility alignment.</li>
+              </ul>
+            </div>
+            <div class="pane-visual">
+              <div class="code-badge">Vector Feature Space</div>
+              <pre class="vector-preview">
+v_t = [
+  RSI_dev:        +14.2  (Overbought Signal)
+  MACD_hist_norm: +0.038 (Bullish Momentum)
+  EMA_slope:      +0.64% (Aligned Uptrend)
+  Vol20_std:       0.011 (Normal Volatility)
+  Ret10_pct:      +3.80% (Strong Continuation)
+]
+➜ Cluster Assignment: Regime 0 [Trending Bull]</pre>
+            </div>
           </div>
         </div>
 
-        <div class="chart-wrapper">
-          <canvas id="predictionChart"></canvas>
+        <!-- TAB 2: VECTOR SIMILARITY -->
+        <div id="tab-vector" class="tab-pane">
+          <div class="pane-grid">
+            <div class="pane-text">
+              <h3>k-NN Historical Scenario Matching</h3>
+              <p>Instead of generating synthetic price predictions that compound error over time, we perform a vector search across 3+ years of real historical market data to find the 5 trading days most mathematically similar to today.</p>
+              <ul class="pane-list">
+                <li><span>✓</span> <b>Cosine Angle Distance:</b> Measure exact similarity between feature vectors.</li>
+                <li><span>✓</span> <b>Verifiable History:</b> Shows actual 10-day forward price trajectories following those exact dates.</li>
+                <li><span>✓</span> <b>Zero Hallucinations:</b> 100% real historical data from yfinance.</li>
+              </ul>
+            </div>
+            <div class="pane-visual">
+              <div class="code-badge">Cosine Similarity Distance Matrix</div>
+              <pre class="vector-preview">
+Top Matches Identified:
+1. 2025-10-06  |  Match: 98.4%  |  Fwd 10d: +2.16%
+2. 2024-05-14  |  Match: 97.2%  |  Fwd 10d: +4.80%
+3. 2023-11-02  |  Match: 96.5%  |  Fwd 10d: -1.20%
+4. 2023-03-21  |  Match: 95.8%  |  Fwd 10d: +3.10%
+5. 2022-07-19  |  Match: 95.1%  |  Fwd 10d: +5.40%</pre>
+            </div>
+          </div>
         </div>
 
-        <div class="future-predictions">
-          <h4>Future Forecast</h4>
-          <table id="futureTable">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Predicted Price</th>
-              </tr>
-            </thead>
-            <tbody id="futureTableBody"></tbody>
-          </table>
+        <!-- TAB 3: TACTICAL RISK GATEKEEPER -->
+        <div id="tab-tactical" class="tab-pane">
+          <div class="pane-grid">
+            <div class="pane-text">
+              <h3>Risk Condition Score & Drawdown Protection</h3>
+              <p>Computes a 0–10 Risk Condition Score combining volatility expansion, RSI extremity, and trend divergence. Automates tactical allocation to protect portfolio equity during market crashes.</p>
+              <ul class="pane-list">
+                <li><span>✓</span> <b>Bull / Recovery:</b> 100% Equity Exposure (Maximum upside participation)</li>
+                <li><span>✓</span> <b>Sideways / Overbought:</b> 50% Equity / 50% Cash (Capital preservation)</li>
+                <li><span>✓</span> <b>Bear / High Stress:</b> 0% Equity / 100% Cash (Drawdown elimination)</li>
+              </ul>
+            </div>
+            <div class="pane-visual">
+              <div class="code-badge">Tactical Allocation Matrix</div>
+              <div style="padding:1.2rem;background:var(--bg);border-radius:8px;font-size:.85rem;margin-top:.4rem;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:.6rem;">
+                  <span>Bullish Regimes (0, 3):</span> <strong style="color:var(--green)">100% Equity</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:.6rem;">
+                  <span>Neutral Regimes (1, 2):</span> <strong style="color:var(--amber)">50% Equity / 50% Cash</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;">
+                  <span>Stress/Bear Regimes (4, 5):</span> <strong style="color:var(--red)">0% Equity (100% Protection)</strong>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="tech-stack" id="tech">
-    <h2>Technology Stack</h2>
-    <div class="tech-grid">
-      <div class="tech-item">Python</div>
-      <div class="tech-item">TensorFlow</div>
-      <div class="tech-item">Flask</div>
-      <div class="tech-item">Chart.js</div>
-      <div class="tech-item">Streamlit</div>
-      <div class="tech-item">yfinance</div>
-      <div class="tech-item">Pandas</div>
-    </div>
-  </section>div></h2>section>div></h4>
-  </div>div></div>div>div></div>div></div>
-  </option>""
 
-  <section class="faq" id="faq">
-    <h2>Frequently Asked Questions</h2>
-    <div class="faq-item">
-      <div class="faq-question">
-        <span>How accurate is StockBuddy?</span>
-        <span class="faq-icon">+</span>
+  <!-- ARCHITECTURE PIPELINE (INTERACTIVE TERMINAL INSPECTOR - ZERO CARDS) -->
+  <section class="pipeline-section" id="architecture">
+    <div class="section-label">Technical Pipeline</div>
+    <h2 class="section-title">How the Regime Engine Works</h2>
+    <p class="section-sub">Select any pipeline stage below to inspect its mathematical formulation, python implementation, and feature transformations.</p>
+
+    <div class="pipeline-console">
+      <!-- Left: Vertical Node Stepper -->
+      <div class="pipeline-stepper">
+        <div class="step-node active" onclick="inspectStep(1)">
+          <div class="node-bullet">01</div>
+          <div class="node-info">
+            <span class="node-title">Data Ingestion</span>
+            <span class="node-sub">yfinance OHLCV Fetch</span>
+          </div>
+        </div>
+        <div class="step-node" onclick="inspectStep(2)">
+          <div class="node-bullet">02</div>
+          <div class="node-info">
+            <span class="node-title">Preprocessing</span>
+            <span class="node-sub">Winsorization & IQR Filter</span>
+          </div>
+        </div>
+        <div class="step-node" onclick="inspectStep(3)">
+          <div class="node-bullet">03</div>
+          <div class="node-info">
+            <span class="node-title">Feature Engineering</span>
+            <span class="node-sub">5D Standardized Vector</span>
+          </div>
+        </div>
+        <div class="step-node" onclick="inspectStep(4)">
+          <div class="node-bullet">04</div>
+          <div class="node-info">
+            <span class="node-title">K-Means Clustering</span>
+            <span class="node-sub">Unsupervised 6-Regime Fit</span>
+          </div>
+        </div>
+        <div class="step-node" onclick="inspectStep(5)">
+          <div class="node-bullet">05</div>
+          <div class="node-info">
+            <span class="node-title">Risk Score Engine</span>
+            <span class="node-sub">Composite 0–10 Score</span>
+          </div>
+        </div>
+        <div class="step-node" onclick="inspectStep(6)">
+          <div class="node-bullet">06</div>
+          <div class="node-info">
+            <span class="node-title">Nearest-Neighbor Search</span>
+            <span class="node-sub">Vector Cosine Distance</span>
+          </div>
+        </div>
+        <div class="step-node" onclick="inspectStep(7)">
+          <div class="node-bullet">07</div>
+          <div class="node-info">
+            <span class="node-title">Quant Strategy Backtest</span>
+            <span class="node-sub">Sharpe & Equity Benchmark</span>
+          </div>
+        </div>
       </div>
-      <div class="faq-answer">
-        Our ensemble model achieves 91.2% directional accuracy on backtested data. However, past performance doesn't
-        guarantee future results. We provide confidence intervals with every prediction to help you understand
-        uncertainty.
+
+      <!-- Right: Visual Data Flow & Parameter Inspector (NO CODE) -->
+      <div class="pipeline-inspector">
+        <div class="inspector-header">
+          <div class="window-dots">
+            <span class="dot-red"></span><span class="dot-yellow"></span><span class="dot-green"></span>
+          </div>
+          <div class="inspector-title" id="inspectorStepTitle">STAGE_01_SPEC.json</div>
+        </div>
+        <div class="inspector-body">
+          <div class="inspector-badge" id="inspectorBadge">Stage 01: Data Ingestion</div>
+          <h3 id="inspectorHeading">yfinance OHLCV Historical Fetch</h3>
+          <p id="inspectorDesc">Fetches daily market data (Open, High, Low, Close, Volume) over specified date ranges. Memory caching prevents redundant API calls.</p>
+          
+          <div class="data-flow-box">
+            <div class="flow-step">
+              <span class="flow-label">INPUT</span>
+              <strong id="flowInput">Global Ticker (e.g. AAPL)</strong>
+            </div>
+            <div class="flow-arrow">➔</div>
+            <div class="flow-step">
+              <span class="flow-label">PROCESS</span>
+              <strong id="flowProcess">API Fetch & Cache</strong>
+            </div>
+            <div class="flow-arrow">➔</div>
+            <div class="flow-step">
+              <span class="flow-label">OUTPUT</span>
+              <strong id="flowOutput">OHLCV Price Array</strong>
+            </div>
+          </div>
+
+          <div class="params-grid">
+            <div class="param-card">
+              <span class="param-key" id="p1Key">Data Source</span>
+              <strong class="param-val" id="p1Val">yfinance API</strong>
+            </div>
+            <div class="param-card">
+              <span class="param-key" id="p2Key">Frequency</span>
+              <strong class="param-val" id="p2Val">Daily Close</strong>
+            </div>
+            <div class="param-card">
+              <span class="param-key" id="p3Key">Lookback</span>
+              <strong class="param-val" id="p3Val">3+ Years History</strong>
+            </div>
+            <div class="param-card">
+              <span class="param-key" id="p4Key">Data Integrity</span>
+              <strong class="param-val" id="p4Val">Split Adjusted</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+
+  <!-- REGIME INTELLIGENCE SECTION -->
+  <section class="regime-section" id="regime">
+    <div class="section-label">Core Feature</div>
+    <h2 class="section-title">Market Regime Intelligence</h2>
+    <p class="section-sub">Enter any ticker to classify its current market regime, compute the Risk Condition Score, and see historical odds for this exact condition.</p>
+
+    <!-- INSTITUTIONAL COMMAND CONSOLE -->
+    <div class="regime-command-console reveal">
+      <div class="regime-console-bar">
+        <div class="regime-console-status">
+          <span class="live-dot"></span>
+          LIVE YFINANCE OHLCV PIPELINE CONNECTED
+        </div>
+        <div>ALGORITHM: UNSUPERVISED K-MEANS (k=6) + COSINE k-NN</div>
+      </div>
+      <div class="regime-controls-body">
+        <div class="field-group">
+          <label for="regimeTicker">Stock Ticker</label>
+          <input type="text" id="regimeTicker" placeholder="AAPL" value="AAPL" maxlength="10" style="width:110px;">
+        </div>
+        <div class="field-group">
+          <label for="regimeStart">Start Date & Quick History Shortcuts</label>
+          <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;">
+            <input type="date" id="regimeStart" value="2021-01-01">
+            <div class="range-pills">
+              <button type="button" class="pill-btn" onclick="setQuickRange(1)">1Y</button>
+              <button type="button" class="pill-btn" onclick="setQuickRange(3)">3Y</button>
+              <button type="button" class="pill-btn active" onclick="setQuickRange(5)">5Y</button>
+              <button type="button" class="pill-btn" onclick="setQuickRange(10)">10Y</button>
+              <button type="button" class="pill-btn" onclick="setQuickRange(15)">15Y</button>
+            </div>
+          </div>
+        </div>
+        <div class="field-group">
+          <label for="regimeEnd">End Date</label>
+          <input type="date" id="regimeEnd">
+        </div>
+        <button id="analyzeBtn">Analyze Regime →</button>
       </div>
     </div>
-    <div class="faq-item">
-      <div class="faq-question">
-        <span>Is the data live?</span>
-        <span class="faq-icon">+</span>
-      </div>
-      <div class="faq-answer">
-        Yes, StockBuddy pulls real-time market data from Yahoo Finance API. Predictions are updated continuously as new
-        market data becomes available.
-      </div>
+
+
+
+    <div class="regime-loading" id="regimeLoading">
+      <div class="spinner"></div>
+      <div id="regimeLoadingText">Fetching market data and classifying regimes...</div>
     </div>
-    <div class="faq-item">
-      <div class="faq-question">
-        <span>Can I integrate it into my trading system?</span>
-        <span class="faq-icon">+</span>
+
+    <div class="regime-dashboard" id="regimeDashboard">
+      <!-- Top 3 cards: Regime Badge | Risk Gauge | Alert -->
+      <div class="regime-top-grid">
+        <div class="regime-badge-card" id="regimeBadgeCard">
+          <div class="card-label">Current Regime</div>
+          <div class="regime-name-pill" id="regimeNamePill">—</div>
+          <div class="regime-desc" id="regimeDesc">—</div>
+        </div>
+        <div class="risk-card">
+          <div class="card-label">Risk Condition Score</div>
+          <canvas id="gaugeCanvas" width="200" height="110"></canvas>
+          <div class="risk-score-num" id="riskScoreNum">—</div>
+          <div class="risk-score-sub" id="riskScoreSub">out of 10</div>
+        </div>
+        <div class="alert-card" id="alertCard">
+          <div class="card-label">Condition Alert</div>
+          <div class="alert-badge" id="alertBadge">
+            <div class="alert-dot" id="alertDot"></div>
+            <span id="alertLabel">—</span>
+          </div>
+          <div class="alert-desc" id="alertDesc">—</div>
+        </div>
       </div>
-      <div class="faq-answer">
-        Absolutely. StockBuddy offers a RESTful API that you can integrate into your trading systems. Check our
-        technical documentation for API endpoints and authentication details.
+
+      <!-- Indicators row -->
+      <div class="indicators-row">
+        <div class="ind-card">
+          <div class="ind-label">RSI (14)</div>
+          <div class="ind-value" id="indRSI">—</div>
+          <div class="ind-status" id="indRSIStatus">—</div>
+        </div>
+        <div class="ind-card">
+          <div class="ind-label">vs EMA 20</div>
+          <div class="ind-value" id="indEMA">—</div>
+          <div class="ind-status" id="indEMAStatus">—</div>
+        </div>
+        <div class="ind-card">
+          <div class="ind-label">MACD Hist</div>
+          <div class="ind-value" id="indMACD">—</div>
+          <div class="ind-status" id="indMACDStatus">—</div>
+        </div>
+        <div class="ind-card">
+          <div class="ind-label">Daily Return</div>
+          <div class="ind-value" id="indRet">—</div>
+          <div class="ind-status" id="indRetStatus">—</div>
+        </div>
       </div>
+
+      <!-- Charts row: timeline + odds -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <h4>📅 Regime Timeline — Price with Regime Background</h4>
+          <canvas id="timelineChart" height="200"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>📊 Historical Odds — Current Regime</h4>
+          <div class="odds-grid" id="oddsGrid">
+            <div class="odds-card">
+              <div class="odds-horizon">5-Day Fwd</div>
+              <div class="odds-pct" id="odds5pct">—</div>
+              <div class="odds-median" id="odds5med">Median: —</div>
+              <div class="odds-count" id="odds5cnt">— occurrences</div>
+            </div>
+            <div class="odds-card">
+              <div class="odds-horizon">10-Day Fwd</div>
+              <div class="odds-pct" id="odds10pct">—</div>
+              <div class="odds-median" id="odds10med">Median: —</div>
+              <div class="odds-count" id="odds10cnt">— occurrences</div>
+            </div>
+            <div class="odds-card">
+              <div class="odds-horizon">20-Day Fwd</div>
+              <div class="odds-pct" id="odds20pct">—</div>
+              <div class="odds-median" id="odds20med">Median: —</div>
+              <div class="odds-count" id="odds20cnt">— occurrences</div>
+            </div>
+          </div>
+          <div style="margin-top:1rem;font-size:.72rem;color:var(--muted);line-height:1.5;">
+            ⚠️ Historical odds are informational only. Past regime performance does not guarantee future results.
+          </div>
+        </div>
+      </div>
+
+      <!-- NEW SECTION 1: Vector Nearest-Neighbor Scenario Matching -->
+      <div style="margin-top:2rem;" class="chart-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h4 style="color:var(--cyan);margin:0;font-size:1.1rem;">🧬 Top 5 Nearest-Neighbor Historical Scenarios (Cosine Similarity)</h4>
+            <div style="font-size:.8rem;color:var(--muted);margin-top:.2rem;">
+              Matches today's technical vector (RSI, Vol, MACD, EMA slope) against 3+ years of real historical market data. Zero synthetic predictions.
+            </div>
+          </div>
+          <div style="background:rgba(0,255,224,0.08);border:1px solid rgba(0,255,224,0.2);padding:.3rem .8rem;border-radius:20px;font-size:.75rem;color:var(--cyan);font-weight:600;">
+            100% Real Historical Data
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start;" class="scenario-grid">
+          <div>
+            <table style="width:100%;font-size:.82rem;">
+              <thead>
+                <tr>
+                  <th>Matched Date</th>
+                  <th>Match %</th>
+                  <th>Regime</th>
+                  <th>Actual 10d Ret</th>
+                </tr>
+              </thead>
+              <tbody id="similarTableBody">
+                <tr><td colspan="4" style="text-align:center;color:var(--muted);">Run regime analysis to view matches</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <h5 style="color:var(--text);font-size:.85rem;margin-bottom:.8rem;">10-Day Trajectory Comparison (Base 100)</h5>
+            <canvas id="similarChart" height="210"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- NEW SECTION 2: Quantitative Regime Strategy vs. Buy & Hold -->
+      <div style="margin-top:2rem;" class="chart-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h4 style="color:var(--cyan);margin:0;font-size:1.1rem;">⚖️ Tactical Regime Strategy vs. Buy & Hold Benchmark</h4>
+            <div style="font-size:.8rem;color:var(--muted);margin-top:.2rem;">
+              Tactical allocation (100% Equity in Bull/Recovery, 50% in Sideways/Overbought, 0% in Bear/Stress) evaluated on real historical prices.
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics-row" style="margin-bottom:1.2rem;">
+          <div class="metric-box">
+            <div class="metric-label">Strategy Total Return</div>
+            <div class="metric-value" id="qStratRet">—</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Benchmark Return</div>
+            <div class="metric-value" id="qBenchRet" style="color:#8892a4;">—</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Max Drawdown</div>
+            <div class="metric-value" id="qStratMDD" style="color:#00ff88;">—</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Strategy Sharpe</div>
+            <div class="metric-value" id="qSharpe">—</div>
+          </div>
+        </div>
+
+        <canvas id="quantChart" height="180"></canvas>
+      </div>
+
     </div>
-    <div class="faq-item">
-      <div class="faq-question">
-        <span>Can I add my own models?</span>
-        <span class="faq-icon">+</span>
+  </section>
+
+
+  <!-- ADVANCED: DEEP LEARNING NEURAL STUDIO (ZERO CARDS) -->
+  <section class="predict-section" id="predict">
+    <div class="section-label">Signal Benchmark</div>
+    <h2 class="section-title">Deep Learning Neural Studio</h2>
+    <p class="section-sub">Train LSTM, GRU, or Transformer models on historical log-returns for out-of-sample directional benchmarking.</p>
+
+    <div class="disclaimer">
+      ℹ️ <strong>Quantitative Note:</strong> Neural network models analyze non-linear patterns in historical log-returns. Directional accuracy of 55–65% represents a valid statistical signal, but should be evaluated alongside the Regime Engine above.
+    </div>
+
+    <!-- COMMAND TOOLBAR (ZERO CARDS) -->
+    <div class="nn-studio-toolbar">
+      <div class="nn-field"><label for="predTicker">Ticker</label><input type="text" id="predTicker" value="AAPL" placeholder="AAPL" style="width:90px;"></div>
+      <div class="nn-field"><label for="predModel">Architecture</label>
+        <select id="predModel">
+          <option value="LSTM">LSTM Network</option>
+          <option value="GRU">GRU Recurrent</option>
+          <option value="Transformer">Transformer Self-Attn</option>
+        </select>
       </div>
-      <div class="faq-answer">
-        Yes, StockBuddy is open-source and modular. You can train custom models and integrate them into the prediction
-        ensemble. See our GitHub repository for contribution guidelines.
+      <div class="nn-field"><label for="predStartDate">Start Date</label><input type="date" id="predStartDate" value="2020-01-01"></div>
+      <div class="nn-field"><label for="predEndDate">End Date</label><input type="date" id="predEndDate"></div>
+      <div class="nn-field"><label for="predSequence">Seq Length</label><input type="number" id="predSequence" value="90" min="30" max="365" style="width:75px;"></div>
+      <div class="nn-field"><label for="predEpochs">Epochs</label><input type="number" id="predEpochs" value="20" min="5" max="100" style="width:65px;"></div>
+      <div class="nn-field"><label for="predBatch">Batch</label><input type="number" id="predBatch" value="16" min="8" max="128" step="8" style="width:65px;"></div>
+      <div class="nn-field"><label for="predFuture">Forecast Days</label><input type="number" id="predFuture" value="5" min="1" max="60" style="width:70px;"></div>
+      <button class="train-btn" id="predictBtn"><span id="predictBtnText">Train Signal Model ▶</span></button>
+    </div>
+
+    <div class="progress-bar" id="predProgress"><div class="progress-fill" id="predProgressFill"></div></div>
+
+    <!-- MAIN NEURAL WORKSPACE CONSOLE -->
+    <div class="nn-workspace-console">
+      <div class="nn-console-header">
+        <div class="window-dots"><span class="dot-red"></span><span class="dot-yellow"></span><span class="dot-green"></span></div>
+        <div class="console-title" id="nnConsoleTitle">NEURAL_MODEL_STUDIO.py // STANDBY</div>
+      </div>
+
+      <!-- METRICS HEADER BAR -->
+      <div class="nn-metrics-bar">
+        <div class="nn-metric"><span class="nn-m-key">Out-of-Sample RMSE</span><strong class="nn-m-val" id="metricRMSE">—</strong></div>
+        <div class="nn-metric"><span class="nn-m-key">Mean Absolute Error</span><strong class="nn-m-val" id="metricMAE">—</strong></div>
+        <div class="nn-metric"><span class="nn-m-key">Directional Accuracy</span><strong class="nn-m-val" id="metricDA">—</strong></div>
+        <div class="nn-metric"><span class="nn-m-key">Out-of-Sample Sharpe</span><strong class="nn-m-val" id="metricSharpe">—</strong></div>
+      </div>
+
+      <!-- WORKSPACE SPLIT GRID -->
+      <div class="nn-studio-split">
+        <!-- LEFT: Real-time Terminal Log & Parameters -->
+        <div class="nn-left-pane">
+          <div class="pane-header">Neural Execution Log</div>
+          <div class="status-log" id="statusLog" style="display:block;height:180px;margin:0;">
+            <div>[00:00:00] Neural Signal Studio initialized.</div>
+            <div>[00:00:00] Select model parameters above and click "Train Signal Model".</div>
+          </div>
+
+          <div class="nn-matrix-standby">
+            <div class="standby-title">⚡ Model Hyperparameter Matrix</div>
+            <div class="standby-grid">
+              <div><span>Optimizer:</span> <strong>Adam (lr=0.001)</strong></div>
+              <div><span>Loss Function:</span> <strong>Huber Loss</strong></div>
+              <div><span>Validation Split:</span> <strong>15% Out-of-Sample</strong></div>
+              <div><span>Early Stopping:</span> <strong>Patience = 5</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Interactive Chart & Forecast Table -->
+        <div class="nn-right-pane">
+          <div class="chart-wrapper"><canvas id="predictionChart" height="200"></canvas></div>
+          <div id="predictResults" style="display:none;" class="future-table-wrap">
+            <h4>Out-of-Sample Directional Forecast Matrix</h4>
+            <table><thead><tr><th>Forecast Date</th><th>Reconstructed Target Price</th></tr></thead><tbody id="futureTableBody"></tbody></table>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
-  <footer>
-    <p>StockBuddy is open-source software licensed under MIT. <a href="https://github.com/username/stockbuddy"
-        target="_blank">View on GitHub</a></p>
-    <p style="margin-top: 1rem;">&copy; 2025 StockBuddy. Not financial advice. Use at your own risk.</p>
+
+  <!-- HOW IT WORKS (HORIZONTAL EXECUTION CIRCUIT) -->
+  <section class="how-section" id="how-it-works">
+    <div class="section-label">Under The Hood</div>
+    <h2 class="section-title">Execution Pipeline Workflow</h2>
+    <p class="section-sub">Interact with the execution circuit below to inspect the quantitative transformations across each phase.</p>
+
+    <div class="circuit-container reveal">
+      <!-- Horizontal Process Track -->
+      <div class="circuit-track">
+        <div class="circuit-line"></div>
+        <div class="circuit-line-progress" id="circuitProgress"></div>
+
+        <div class="circuit-node active" onclick="switchCircuitNode(1)">
+          <div class="circuit-node-dot">01</div>
+          <div class="circuit-node-label">Ingestion</div>
+        </div>
+        <div class="circuit-node" onclick="switchCircuitNode(2)">
+          <div class="circuit-node-dot">02</div>
+          <div class="circuit-node-label">Signals</div>
+        </div>
+        <div class="circuit-node" onclick="switchCircuitNode(3)">
+          <div class="circuit-node-dot">03</div>
+          <div class="circuit-node-label">K-Means</div>
+        </div>
+        <div class="circuit-node" onclick="switchCircuitNode(4)">
+          <div class="circuit-node-dot">04</div>
+          <div class="circuit-node-label">Cosine k-NN</div>
+        </div>
+        <div class="circuit-node" onclick="switchCircuitNode(5)">
+          <div class="circuit-node-dot">05</div>
+          <div class="circuit-node-label">Backtest</div>
+        </div>
+        <div class="circuit-node" onclick="switchCircuitNode(6)">
+          <div class="circuit-node-dot">06</div>
+          <div class="circuit-node-label">Neural Studio</div>
+        </div>
+      </div>
+
+      <!-- Execution Display Panel -->
+      <div class="circuit-display">
+        <div class="circuit-display-header">
+          <div class="circuit-event-badge" id="circuitEvent">[EVENT: USER_CLICK_ANALYZE_REGIME]</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:.76rem;color:var(--muted);" id="circuitStageTag">PHASE 01 OF 06</div>
+        </div>
+        <h3 class="circuit-stage-title" id="circuitTitle">01. Real-Time Market Data Ingestion Pipeline</h3>
+        <p class="circuit-stage-desc" id="circuitDesc">
+          Upon receiving a ticker query, the Flask server initiates a synchronous HTTPS fetch to the Yahoo Finance API to retrieve historical OHLCV bar series across specified start and end timestamps.
+        </p>
+        
+        <div class="circuit-matrix-flow">
+          <div class="matrix-box">
+            <div class="matrix-box-label">Input Payload</div>
+            <div class="matrix-box-val" id="circuitInput">Ticker, Start/End Date</div>
+          </div>
+          <div class="matrix-box">
+            <div class="matrix-box-label">Transformation Method</div>
+            <div class="matrix-box-val" id="circuitProcess">RESTful yfinance API Stream</div>
+          </div>
+          <div class="matrix-box">
+            <div class="matrix-box-label">Output Artifact</div>
+            <div class="matrix-box-val" id="circuitOutput">Raw OHLCV DataFrame</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+
+
+  <!-- FAQ -->
+  <section class="faq-section" id="faq">
+    <div class="section-label">Questions</div>
+    <h2 class="section-title">Frequently Asked</h2>
+    <div class="faq-wrap">
+      <div class="faq-item">
+        <div class="faq-q"><span>Why regimes instead of price predictions?</span><span class="faq-icon">+</span></div>
+        <div class="faq-a">Stock prices on efficient markets are near-random walk processes. However, technical indicator states (momentum, volatility, trend) do exhibit autocorrelation over short windows. Classifying the current state and showing historical odds for that state is statistically honest — unlike a single price forecast.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q"><span>How are the 6 regimes defined?</span><span class="faq-icon">+</span></div>
+        <div class="faq-a">K-Means clusters on 5 features: RSI deviation from 50, normalized MACD histogram, EMA slope, 20-day volatility (std of log-returns), and 10-day price return. Clusters are then semantically ordered by a score combining momentum and volatility, mapping them to: Trending Bull, Overbought/Exhaustion, Sideways/Choppy, Recovery/Bounce, Downtrend/Bear, and High Volatility/Stress.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q"><span>What does the Risk Condition Score mean?</span><span class="faq-icon">+</span></div>
+        <div class="faq-a">It's a 0–10 composite of: volatility stress (current vol vs. 90-day average), RSI extremity (distance from 50), trend misalignment (Close below EMA20), and MACD divergence (histogram negative). Score 0–3 = calm/bullish conditions; 7–10 = elevated risk. It's smoothed over 5 days to reduce daily noise.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q"><span>Is this financial advice?</span><span class="faq-icon">+</span></div>
+        <div class="faq-a">Absolutely not. StockBuddy is an educational and research tool. Historical regime odds inform probability — they are not guarantees. Always consult a registered investment advisor before making any investment decisions.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q"><span>Can I use my own data?</span><span class="faq-icon">+</span></div>
+        <div class="faq-a">Yes — the backend pipeline accepts any OHLCV dataframe. The regime engine can be enhanced with India VIX, FII/DII flow data, sector rotation data, and earnings calendars to produce richer regime classification.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER (INSTITUTIONAL STUDIO) -->
+  <footer class="studio-footer">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-logo">
+          <span style="color:var(--cyan);">StockBuddy</span> Atelier
+        </div>
+        <div class="footer-tagline">
+          Institutional-grade quantitative market intelligence & vector regime discovery engine. Built for verifiable quantitative analysis.
+        </div>
+      </div>
+      <div>
+        <div class="footer-title">Platform Navigation</div>
+        <div class="footer-links">
+          <a href="#pipeline">System Architecture</a>
+          <a href="#regime">Regime Intelligence</a>
+          <a href="#predict">Neural Signal Studio</a>
+          <a href="#tech">Technology Matrix</a>
+          <a href="#faq">FAQ Knowledge Base</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-title">Engine Health & Specs</div>
+        <div class="footer-status-box">
+          <div class="status-item"><span>Flask REST API:</span> <strong>Port 5000 (Active)</strong></div>
+          <div class="status-item"><span>Data Ingestion:</span> <strong>yfinance Live OHLCV</strong></div>
+          <div class="status-item"><span>Machine Learning:</span> <strong>K-Means (k=6) + Cosine k-NN</strong></div>
+          <div class="status-item"><span>Deep Learning:</span> <strong>LSTM / GRU / Transformer</strong></div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div>StockBuddy is open-source software under MIT License. <a href="https://github.com/dhruv-shgal/StockBuddy" target="_blank">View Repository on GitHub ↗</a></div>
+      <div>© 2026 StockBuddy Atelier — Quantitative Research Purpose Only.</div>
+    </div>
   </footer>
 
   <script>
-    // Animated particles background
-    const canvas = document.getElementById('particles');
-    const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    const API = 'http://localhost:5000';
 
-    const particles = [];
-    const particleCount = 100;
+    // Particles
+    const pc = document.getElementById('particles');
+    const px = pc.getContext('2d');
+    function resizeP() { pc.width = window.innerWidth; pc.height = window.innerHeight; }
+    resizeP(); window.addEventListener('resize', resizeP);
+    const pts = Array.from({length:90}, () => ({
+      x: Math.random()*pc.width, y: Math.random()*pc.height,
+      vx:(Math.random()-.5)*.4, vy:(Math.random()-.5)*.4, r:Math.random()*1.8+.4
+    }));
+    (function animP(){ px.clearRect(0,0,pc.width,pc.height); px.fillStyle='rgba(0,255,224,0.45)';
+      pts.forEach(p=>{ p.x+=p.vx; p.y+=p.vy;
+        if(p.x<0||p.x>pc.width)p.vx*=-1; if(p.y<0||p.y>pc.height)p.vy*=-1;
+        px.beginPath(); px.arc(p.x,p.y,p.r,0,Math.PI*2); px.fill();
+      }); requestAnimationFrame(animP); })();
 
-    for (let i = 0; i < particleCount; i++) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
-        radius: Math.random() * 2
-      });
-    }
-
-    function animateParticles() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = 'rgba(0, 255, 224, 0.5)';
-
-      particles.forEach(p => {
-        p.x += p.vx;
-        p.y += p.vy;
-
-        if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
-        if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      requestAnimationFrame(animateParticles);
-    }
-
-    animateParticles();
-
-    // Live ticker simulation
-    const ticker = document.getElementById('liveTicker');
-    let price = 150.00;
-    setInterval(() => {
-      price += (Math.random() - 0.5) * 2;
-      ticker.textContent = `$${price.toFixed(2)}`;
-      ticker.style.color = Math.random() > 0.5 ? '#00ff88' : '#ff3366';
-    }, 2000);
-
-    // FAQ accordion
-    document.querySelectorAll('.faq-item').forEach(item => {
-      item.querySelector('.faq-question').addEventListener('click', () => {
-        item.classList.toggle('active');
-      });
+    // FAQ
+    document.querySelectorAll('.faq-item').forEach(item=>{
+      item.querySelector('.faq-q').addEventListener('click',()=>item.classList.toggle('open'));
     });
-
-    // Neural network visualization
-    const nnCanvas = document.getElementById('neuralNetwork');
-    const nnCtx = nnCanvas.getContext('2d');
-    nnCanvas.width = 400;
-    nnCanvas.height = 300;
-
-    function drawNeuralNetwork() {
-      nnCtx.clearRect(0, 0, nnCanvas.width, nnCanvas.height);
-      nnCtx.strokeStyle = '#00ffe0';
-      nnCtx.fillStyle = '#00ffe0';
-      nnCtx.lineWidth = 2;
-
-      const layers = [3, 5, 4, 2];
-      const layerSpacing = nnCanvas.width / (layers.length + 1);
-      const time = Date.now() * 0.001;
-
-      for (let i = 0; i < layers.length; i++) {
-        const nodeSpacing = nnCanvas.height / (layers[i] + 1);
-        for (let j = 0; j < layers[i]; j++) {
-          const x = layerSpacing * (i + 1);
-          const y = nodeSpacing * (j + 1);
-
-          if (i < layers.length - 1) {
-            for (let k = 0; k < layers[i + 1]; k++) {
-              const nextY = (nnCanvas.height / (layers[i + 1] + 1)) * (k + 1);
-              nnCtx.globalAlpha = 0.3 + Math.sin(time + i + j + k) * 0.2;
-              nnCtx.beginPath();
-              nnCtx.moveTo(x, y);
-              nnCtx.lineTo(layerSpacing * (i + 2), nextY);
-              nnCtx.stroke();
-            }
-          }
-
-          nnCtx.globalAlpha = 1;
-          nnCtx.beginPath();
-          nnCtx.arc(x, y, 5, 0, Math.PI * 2);
-          nnCtx.fill();
-        }
-      }
-
-      requestAnimationFrame(drawNeuralNetwork);
-    }
-
-    drawNeuralNetwork();
-
-    // Confidence band visualization
-    const cbCanvas = document.getElementById('confidenceBand');
-    const cbCtx = cbCanvas.getContext('2d');
-    cbCanvas.width = 400;
-    cbCanvas.height = 300;
-
-    function drawConfidenceBand() {
-      cbCtx.clearRect(0, 0, cbCanvas.width, cbCanvas.height);
-      cbCtx.strokeStyle = '#00ffe0';
-      cbCtx.fillStyle = 'rgba(0, 255, 224, 0.1)';
-      cbCtx.lineWidth = 2;
-
-      const points = 50;
-      const time = Date.now() * 0.0005;
-
-      cbCtx.beginPath();
-      for (let i = 0; i < points; i++) {
-        const x = (cbCanvas.width / points) * i;
-        const y = cbCanvas.height / 2 + Math.sin(i * 0.2 + time) * 40;
-        const upperY = y - 30 - Math.sin(i * 0.1 + time) * 10;
-        if (i === 0) cbCtx.moveTo(x, upperY);
-        else cbCtx.lineTo(x, upperY);
-      }
-      for (let i = points - 1; i >= 0; i--) {
-        const x = (cbCanvas.width / points) * i;
-        const y = cbCanvas.height / 2 + Math.sin(i * 0.2 + time) * 40;
-        const lowerY = y + 30 + Math.sin(i * 0.1 + time) * 10;
-        cbCtx.lineTo(x, lowerY);
-      }
-      cbCtx.closePath();
-      cbCtx.fill();
-
-      cbCtx.beginPath();
-      for (let i = 0; i < points; i++) {
-        const x = (cbCanvas.width / points) * i;
-        const y = cbCanvas.height / 2 + Math.sin(i * 0.2 + time) * 40;
-        if (i === 0) cbCtx.moveTo(x, y);
-        else cbCtx.lineTo(x, y);
-      }
-      cbCtx.stroke();
-
-      requestAnimationFrame(drawConfidenceBand);
-    }
-
-    drawConfidenceBand();
-
-    // Demo chart
-    const demoCanvas = document.getElementById('demoChart');
-    const demoCtx = demoCanvas.getContext('2d');
-    demoCanvas.width = 800;
-    demoCanvas.height = 350;
-
-    function drawDemoChart() {
-      demoCtx.clearRect(0, 0, demoCanvas.width, demoCanvas.height);
-
-      // Grid
-      demoCtx.strokeStyle = 'rgba(0, 255, 224, 0.1)';
-      demoCtx.lineWidth = 1;
-      for (let i = 0; i < 6; i++) {
-        const y = (demoCanvas.height / 5) * i;
-        demoCtx.beginPath();
-        demoCtx.moveTo(0, y);
-        demoCtx.lineTo(demoCanvas.width, y);
-        demoCtx.stroke();
-      }
-
-      const points = 60;
-      const splitPoint = 40;
-      const time = Date.now() * 0.001;
-
-      // Historical data (solid line)
-      demoCtx.strokeStyle = '#888';
-      demoCtx.lineWidth = 3;
-      demoCtx.beginPath();
-      for (let i = 0; i < splitPoint; i++) {
-        const x = (demoCanvas.width / points) * i;
-        const y = demoCanvas.height / 2 + Math.sin(i * 0.15) * 60 + Math.cos(i * 0.1) * 30;
-        if (i === 0) demoCtx.moveTo(x, y);
-        else demoCtx.lineTo(x, y);
-      }
-      demoCtx.stroke();
-
-      // Predicted data (glowing line)
-      demoCtx.strokeStyle = '#00ffe0';
-      demoCtx.lineWidth = 3;
-      demoCtx.shadowBlur = 15;
-      demoCtx.shadowColor = '#00ffe0';
-      demoCtx.beginPath();
-      for (let i = splitPoint - 1; i < points; i++) {
-        const x = (demoCanvas.width / points) * i;
-        const y = demoCanvas.height / 2 + Math.sin(i * 0.15 + time * 0.5) * 50 + Math.cos(i * 0.1) * 25;
-        if (i === splitPoint - 1) demoCtx.moveTo(x, y);
-        else demoCtx.lineTo(x, y);
-      }
-      demoCtx.stroke();
-      demoCtx.shadowBlur = 0;
-
-      // Confidence band for predictions
-      demoCtx.fillStyle = 'rgba(0, 255, 224, 0.1)';
-      demoCtx.beginPath();
-      for (let i = splitPoint - 1; i < points; i++) {
-        const x = (demoCanvas.width / points) * i;
-        const y = demoCanvas.height / 2 + Math.sin(i * 0.15 + time * 0.5) * 50 + Math.cos(i * 0.1) * 25;
-        const offset = 20 + (i - splitPoint) * 0.5;
-        if (i === splitPoint - 1) demoCtx.moveTo(x, y - offset);
-        else demoCtx.lineTo(x, y - offset);
-      }
-      for (let i = points - 1; i >= splitPoint - 1; i--) {
-        const x = (demoCanvas.width / points) * i;
-        const y = demoCanvas.height / 2 + Math.sin(i * 0.15 + time * 0.5) * 50 + Math.cos(i * 0.1) * 25;
-        const offset = 20 + (i - splitPoint) * 0.5;
-        demoCtx.lineTo(x, y + offset);
-      }
-      demoCtx.closePath();
-      demoCtx.fill();
-
-      // Labels
-      demoCtx.fillStyle = '#888';
-      demoCtx.font = '12px Inter';
-      demoCtx.fillText('Historical', 20, 30);
-      demoCtx.fillStyle = '#00ffe0';
-      demoCtx.fillText('Predicted', demoCanvas.width - 80, 30);
-
-      requestAnimationFrame(drawDemoChart);
-    }
-
-    drawDemoChart();
 
     // Smooth scroll
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-      anchor.addEventListener('click', function (e) {
-        e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (target) {
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+    document.querySelectorAll('a[href^="#"]').forEach(a=>{
+      a.addEventListener('click',e=>{ e.preventDefault();
+        const t=document.querySelector(a.getAttribute('href'));
+        if(t) t.scrollIntoView({behavior:'smooth',block:'start'});
       });
     });
 
-    // Resize canvas on window resize
-    window.addEventListener('resize', () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    });
+    // Dates
+    const today=new Date().toISOString().split('T')[0];
+    document.getElementById('regimeEnd').value=today;
+    document.getElementById('predEndDate').value=today;
 
-    // Demo controls functionality
-    document.getElementById('stockSelect').addEventListener('change', function () {
-      console.log('Stock changed to:', this.value);
-    });
+    // Gauge
+    function drawGauge(score, color) {
+      const c=document.getElementById('gaugeCanvas'), ctx=c.getContext('2d');
+      const W=c.width, H=c.height, cx=W/2, cy=H-10, r=Math.min(cx,cy)-10;
+      ctx.clearRect(0,0,W,H);
+      ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI,2*Math.PI);
+      ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=14; ctx.lineCap='round'; ctx.stroke();
+      const valEnd=Math.PI+Math.min(score/10,1)*Math.PI;
+      ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI,valEnd);
+      ctx.strokeStyle=color; ctx.lineWidth=14; ctx.lineCap='round';
+      ctx.shadowColor=color; ctx.shadowBlur=18; ctx.stroke(); ctx.shadowBlur=0;
+    }
 
-    document.getElementById('horizonSelect').addEventListener('change', function () {
-      console.log('Horizon changed to:', this.value);
-    });
+    // Timeline chart
+    let tlChart=null;
+    function renderTimeline(timeline) {
+      const bgPlugin={id:'rbg',beforeDraw(ch){
+        const {ctx,chartArea:{left,right,top,bottom},scales:{x}}=ch; if(!x)return;
+        ctx.save();
+        timeline.forEach((pt,i)=>{
+          const x0=i===0?left:x.getPixelForValue(i-1), x1=x.getPixelForValue(i);
+          ctx.fillStyle=pt.regime_color+'28'; ctx.fillRect(x0,top,x1-x0,bottom-top);
+        }); ctx.restore();
+      }};
+      if(tlChart) tlChart.destroy();
+      tlChart=new Chart(document.getElementById('timelineChart'),{
+        type:'line', plugins:[bgPlugin],
+        data:{labels:timeline.map(t=>t.date), datasets:[{
+          label:'Price', data:timeline.map(t=>t.close),
+          borderColor:'#00ffe0', borderWidth:1.6, pointRadius:0, tension:.3
+        }]},
+        options:{responsive:true,animation:false,
+          plugins:{legend:{display:false},
+            tooltip:{backgroundColor:'rgba(8,12,16,.95)',titleColor:'#00ffe0',bodyColor:'#e2e8f0',
+              borderColor:'rgba(0,255,224,.2)',borderWidth:1,
+              callbacks:{afterBody:(items)=>{const i=items[0].dataIndex;
+                return `Regime: ${timeline[i].regime_name} | Risk: ${(timeline[i].risk_score||0).toFixed(1)}`;
+              }}}},
+          scales:{x:{ticks:{color:'#8892a4',maxTicksLimit:8,font:{size:10}},grid:{color:'rgba(0,255,224,0.06)'}},
+                  y:{ticks:{color:'#8892a4',font:{size:10}},grid:{color:'rgba(0,255,224,0.06)'}}}
+        }
+      });
+    }
 
-    document.getElementById('modelSelect').addEventListener('change', function () {
-      console.log('Model changed to:', this.value);
-    });
+    // Display regime
+    function displayRegime(d) {
+      const r=d.current_regime, score=d.risk_score, alert=d.alert, ind=d.indicators;
+      const curStat=d.regime_stats[String(r.id)];
 
-    // Set default end date to today
-    document.getElementById('predEndDate').value = new Date().toISOString().split('T')[0];
+      const pill=document.getElementById('regimeNamePill');
+      pill.textContent=r.name; pill.style.background=r.color; pill.style.color='#080c10';
+      document.getElementById('regimeBadgeCard').style.borderColor=r.color+'55';
+      document.getElementById('regimeDesc').textContent=r.description;
 
-    // Prediction functionality
-    let predictionChartInstance = null;
-    const API_URL = 'http://localhost:5000';
+      const sc=score<=3.5?'#00ff88':score<=6.5?'#ffaa00':'#ff3366';
+      drawGauge(score,sc);
+      const sn=document.getElementById('riskScoreNum'); sn.textContent=score.toFixed(1); sn.style.color=sc;
 
-    document.getElementById('predictBtn').addEventListener('click', async function () {
-      const ticker = document.getElementById('predTicker').value.trim().toUpperCase();
-      const model = document.getElementById('predModel').value;
-      const startDate = document.getElementById('predStartDate').value;
-      const endDate = document.getElementById('predEndDate').value;
-      const sequenceLength = parseInt(document.getElementById('predSequence').value);
-      const epochs = parseInt(document.getElementById('predEpochs').value);
-      const batchSize = parseInt(document.getElementById('predBatch').value);
-      const futureDays = parseInt(document.getElementById('predFuture').value);
+      const ab=document.getElementById('alertBadge');
+      ab.style.background=alert.color+'22'; ab.style.border=`1px solid ${alert.color}55`;
+      document.getElementById('alertDot').style.background=alert.color;
+      const al=document.getElementById('alertLabel'); al.textContent=alert.label; al.style.color=alert.color;
+      document.getElementById('alertDesc').textContent=alert.description;
 
-      if (!ticker) {
-        alert('Please enter a stock ticker');
+      // Indicators
+      const rsi=ind.rsi||0;
+      const ri=document.getElementById('indRSI'); ri.textContent=rsi.toFixed(1);
+      ri.style.color=rsi>70?'#ff3366':rsi<30?'#00aaff':'#00ffe0';
+      const rs=document.getElementById('indRSIStatus');
+      rs.textContent=rsi>70?'Overbought':rsi<30?'Oversold':'Neutral';
+      rs.style.color=rsi>70?'#ff3366':rsi<30?'#00aaff':'#8892a4';
+
+      const close=ind.close||1, ema=ind.ema20||1, ed=((close-ema)/ema*100);
+      const ei=document.getElementById('indEMA');
+      ei.textContent=(ed>=0?'+':'')+ed.toFixed(2)+'%'; ei.style.color=ed>=0?'#00ff88':'#ff3366';
+      const es=document.getElementById('indEMAStatus');
+      es.textContent=ed>=0?'Above EMA20 ↑':'Below EMA20 ↓'; es.style.color=ed>=0?'#00ff88':'#ff3366';
+
+      const mh=ind.macd_hist||0;
+      const mi=document.getElementById('indMACD'); mi.textContent=mh.toFixed(3); mi.style.color=mh>=0?'#00ff88':'#ff3366';
+      const ms=document.getElementById('indMACDStatus'); ms.textContent=mh>=0?'Bullish ↑':'Bearish ↓'; ms.style.color=mh>=0?'#00ff88':'#ff3366';
+
+      const ret=(ind.logret||0)*100;
+      const reti=document.getElementById('indRet');
+      reti.textContent=(ret>=0?'+':'')+ret.toFixed(2)+'%'; reti.style.color=ret>=0?'#00ff88':'#ff3366';
+      const rets=document.getElementById('indRetStatus'); rets.textContent=ret>=0?'Positive':'Negative'; rets.style.color=ret>=0?'#00ff88':'#ff3366';
+
+      // Odds
+      function fillOdds(prefix, key) {
+        const h=curStat[key], pct=h.pct_positive;
+        const el=document.getElementById(`odds${prefix}pct`);
+        el.textContent=pct!==null?pct.toFixed(0)+'% ↑':'N/A';
+        el.style.color=pct===null?'#8892a4':pct>=60?'#00ff88':pct>=45?'#ffaa00':'#ff3366';
+        document.getElementById(`odds${prefix}med`).textContent=h.median!==null?`Median: ${h.median>=0?'+':''}${h.median.toFixed(2)}%`:'Median: N/A';
+        document.getElementById(`odds${prefix}cnt`).textContent=`${h.count} occurrences`;
+      }
+      fillOdds('5','fwd_5d'); fillOdds('10','fwd_10d'); fillOdds('20','fwd_20d');
+
+      renderTimeline(d.timeline);
+      renderSimilarMatches(d.similar_matches);
+      renderQuantBacktest(d.quant_backtest);
+      document.getElementById('regimeDashboard').style.display='block';
+    }
+
+    // Render 100% Real Historical Scenario Matches (Vector Cosine Similarity)
+    let similarChartInst = null;
+    function renderSimilarMatches(matches) {
+      const tbody = document.getElementById('similarTableBody');
+      tbody.innerHTML = '';
+      if(!matches || matches.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">No matches found</td></tr>';
         return;
       }
 
-      // Disable button and show progress
-      const btn = document.getElementById('predictBtn');
-      const btnText = document.getElementById('predictBtnText');
-      btn.disabled = true;
-      btnText.textContent = 'Training...';
+      const colors = ['#00ffe0', '#00ff88', '#00aaff', '#ffaa00', '#ff3366'];
+      const datasets = [];
 
-      const progress = document.getElementById('predProgress');
-      const progressFill = document.getElementById('predProgressFill');
-      const statusLog = document.getElementById('statusLog');
+      matches.forEach((m, idx) => {
+        const color = colors[idx % colors.length];
+        const tr = document.createElement('tr');
+        const retColor = m.fwd_10d_ret >= 0 ? '#00ff88' : '#ff3366';
+        tr.innerHTML = `
+          <td style="font-weight:600;color:${color};">${m.date}</td>
+          <td style="font-family:'JetBrains Mono';">${m.similarity_pct}%</td>
+          <td><span style="background:${m.regime_color}22;color:${m.regime_color};padding:.2rem .5rem;border-radius:4px;font-size:.75rem;font-weight:600;">${m.regime_name}</span></td>
+          <td style="color:${retColor};font-weight:700;font-family:'JetBrains Mono';">${m.fwd_10d_ret >= 0 ? '+' : ''}${m.fwd_10d_ret.toFixed(2)}%</td>
+        `;
+        tbody.appendChild(tr);
 
-      progress.style.display = 'block';
-      statusLog.style.display = 'block';
-      statusLog.innerHTML = '';
-
-      progressFill.style.width = '10%';
-      addStatusLog('Initializing prediction engine...');
-
-      try {
-        addStatusLog(`Fetching data for ${ticker}...`);
-        progressFill.style.width = '20%';
-
-        const response = await fetch(`${API_URL}/api/predict`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ticker: ticker,
-            start_date: startDate,
-            end_date: endDate,
-            sequence_length: sequenceLength,
-            epochs: epochs,
-            batch_size: batchSize,
-            future_days: futureDays,
-            model: model,
-            early_stopping: true
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        if(m.price_path && m.price_path.length > 0) {
+          datasets.push({
+            label: `${m.date} (${m.similarity_pct}%)`,
+            data: m.price_path,
+            borderColor: color,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.3,
+            fill: false
+          });
         }
+      });
 
-        progressFill.style.width = '40%';
-        addStatusLog('Data fetched successfully');
-        addStatusLog(`Training ${model} model...`);
-
-        const data = await response.json();
-
-        progressFill.style.width = '70%';
-        addStatusLog('Model training complete');
-        addStatusLog('Generating predictions...');
-
-        // Display results
-        displayResults(data, ticker, model);
-
-        progressFill.style.width = '100%';
-        addStatusLog('✓ Prediction complete!');
-
-        setTimeout(() => {
-          progress.style.display = 'none';
-          progressFill.style.width = '0%';
-        }, 2000);
-
-      } catch (error) {
-        console.error('Prediction error:', error);
-        addStatusLog(`✗ Error: ${error.message}`);
-        alert(`Failed to generate prediction: ${error.message}\n\nMake sure the Flask API is running on port 5000.`);
-      } finally {
-        btn.disabled = false;
-        btnText.textContent = 'Train & Predict';
-      }
-    });
-
-    function addStatusLog(message) {
-      const statusLog = document.getElementById('statusLog');
-      const timestamp = new Date().toLocaleTimeString();
-      const logEntry = document.createElement('div');
-      logEntry.textContent = `[${timestamp}] ${message}`;
-      statusLog.appendChild(logEntry);
-      statusLog.scrollTop = statusLog.scrollHeight;
+      if(similarChartInst) similarChartInst.destroy();
+      const labels = Array.from({length: 11}, (_, i) => `Day +${i}`);
+      similarChartInst = new Chart(document.getElementById('similarChart'), {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          animation: false,
+          plugins: {
+            legend: { labels: { color: '#e2e8f0', font: { size: 10 } } },
+            tooltip: { backgroundColor: 'rgba(8,12,16,.95)', titleColor: '#00ffe0', bodyColor: '#e2e8f0', borderColor: 'rgba(0,255,224,.2)', borderWidth: 1 }
+          },
+          scales: {
+            x: { ticks: { color: '#8892a4', font: { size: 10 } }, grid: { color: 'rgba(0,255,224,0.06)' } },
+            y: { ticks: { color: '#8892a4', font: { size: 10 } }, grid: { color: 'rgba(0,255,224,0.06)' } }
+          }
+        }
+      });
     }
 
-    function displayResults(data, ticker, model) {
-      // Show results container
-      document.getElementById('predictResults').style.display = 'block';
+    // Render Quantitative Strategy vs. Buy & Hold Backtest
+    let quantChartInst = null;
+    function renderQuantBacktest(quant) {
+      if(!quant) return;
+      const m = quant.metrics;
 
-      // Display metrics
-      const metrics = data.metrics[model] || data.metrics.Ensemble;
-      document.getElementById('metricRMSE').textContent = metrics.RMSE.toFixed(4);
-      document.getElementById('metricMAE').textContent = metrics.MAE.toFixed(4);
-      document.getElementById('metricDA').textContent = metrics.Directional_Accuracy.toFixed(1) + '%';
-      document.getElementById('metricSharpe').textContent = data.backtest.metrics['Sharpe Ratio'].toFixed(2);
+      const sRet = document.getElementById('qStratRet');
+      sRet.textContent = (m.strategy_total_return >= 0 ? '+' : '') + m.strategy_total_return.toFixed(2) + '%';
+      sRet.style.color = m.strategy_total_return >= 0 ? '#00ff88' : '#ff3366';
 
-      // Display prediction chart
-      displayPredictionChart(data, ticker, model);
+      const bRet = document.getElementById('qBenchRet');
+      bRet.textContent = (m.benchmark_total_return >= 0 ? '+' : '') + m.benchmark_total_return.toFixed(2) + '%';
 
-      // Display future predictions
-      displayFuturePredictions(data.future);
+      const sMDD = document.getElementById('qStratMDD');
+      sMDD.textContent = m.strategy_max_drawdown.toFixed(1) + '%';
+      sMDD.style.color = m.strategy_max_drawdown > -20 ? '#00ff88' : '#ffaa00';
 
-      // Scroll to results
-      document.getElementById('predictResults').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+      const sSharpe = document.getElementById('qSharpe');
+      sSharpe.textContent = m.strategy_sharpe.toFixed(2);
+      sSharpe.style.color = m.strategy_sharpe >= 1.0 ? '#00ff88' : '#00ffe0';
 
-    function displayPredictionChart(data, ticker, model) {
-      const canvas = document.getElementById('predictionChart');
-      const ctx = canvas.getContext('2d');
-
-      // Destroy existing chart if any
-      if (predictionChartInstance) {
-        predictionChartInstance.destroy();
-      }
-
-      const dates = data.dates;
-      const actual = data.actual;
-      const predicted = data.predictions[model] || data.predictions.Ensemble;
-      const lower = data.confidence.lower;
-      const upper = data.confidence.upper;
-
-      predictionChartInstance = new Chart(ctx, {
+      if(quantChartInst) quantChartInst.destroy();
+      quantChartInst = new Chart(document.getElementById('quantChart'), {
         type: 'line',
         data: {
-          labels: dates,
+          labels: quant.dates,
           datasets: [
             {
-              label: 'Actual Price',
-              data: actual,
-              borderColor: '#888',
-              backgroundColor: 'rgba(136, 136, 136, 0.1)',
-              borderWidth: 2,
-              pointRadius: 0,
-              tension: 0.4
-            },
-            {
-              label: `${model} Prediction`,
-              data: predicted,
+              label: 'Tactical Regime Strategy ($10k Base)',
+              data: quant.strategy_equity,
               borderColor: '#00ffe0',
-              backgroundColor: 'rgba(0, 255, 224, 0.1)',
               borderWidth: 2,
               pointRadius: 0,
-              tension: 0.4
+              tension: 0.3
             },
             {
-              label: 'Upper Confidence',
-              data: upper,
-              borderColor: 'rgba(0, 255, 224, 0.3)',
-              backgroundColor: 'rgba(0, 255, 224, 0.05)',
-              borderWidth: 1,
+              label: 'Buy & Hold Benchmark ($10k Base)',
+              data: quant.benchmark_equity,
+              borderColor: '#8892a4',
+              borderWidth: 1.5,
+              borderDash: [4, 4],
               pointRadius: 0,
-              fill: '+1',
-              tension: 0.4
-            },
-            {
-              label: 'Lower Confidence',
-              data: lower,
-              borderColor: 'rgba(0, 255, 224, 0.3)',
-              backgroundColor: 'rgba(0, 255, 224, 0.05)',
-              borderWidth: 1,
-              pointRadius: 0,
-              fill: false,
-              tension: 0.4
+              tension: 0.3
             }
           ]
         },
         options: {
           responsive: true,
-          maintainAspectRatio: true,
+          animation: false,
           plugins: {
-            legend: {
-              display: true,
-              position: 'top',
-              labels: {
-                color: '#e0e0e0',
-                font: {
-                  size: 12
-                }
-              }
-            },
-            title: {
-              display: true,
-              text: `${ticker} Stock Price Prediction - ${model} Model`,
-              color: '#00ffe0',
-              font: {
-                size: 16,
-                weight: 'bold'
-              }
-            },
-            tooltip: {
-              mode: 'index',
-              intersect: false,
-              backgroundColor: 'rgba(10, 10, 10, 0.9)',
-              titleColor: '#00ffe0',
-              bodyColor: '#e0e0e0',
-              borderColor: '#00ffe0',
-              borderWidth: 1
-            }
+            legend: { labels: { color: '#e2e8f0', font: { size: 11 } } },
+            tooltip: { backgroundColor: 'rgba(8,12,16,.95)', titleColor: '#00ffe0', bodyColor: '#e2e8f0', borderColor: 'rgba(0,255,224,.2)', borderWidth: 1 }
           },
           scales: {
-            y: {
-              beginAtZero: false,
-              title: {
-                display: true,
-                text: 'Price ($)',
-                color: '#b0b0b0'
-              },
-              ticks: {
-                color: '#888'
-              },
-              grid: {
-                color: 'rgba(0, 255, 224, 0.1)'
-              }
-            },
-            x: {
-              title: {
-                display: true,
-                text: 'Date',
-                color: '#b0b0b0'
-              },
-              ticks: {
-                color: '#888',
-                maxTicksLimit: 10
-              },
-              grid: {
-                color: 'rgba(0, 255, 224, 0.1)'
-              }
-            }
-          },
-          interaction: {
-            mode: 'nearest',
-            axis: 'x',
-            intersect: false
+            x: { ticks: { color: '#8892a4', maxTicksLimit: 8, font: { size: 10 } }, grid: { color: 'rgba(0,255,224,0.06)' } },
+            y: { ticks: { color: '#8892a4', font: { size: 10 } }, grid: { color: 'rgba(0,255,224,0.06)' } }
           }
         }
       });
     }
 
-    function displayFuturePredictions(futureData) {
-      const tbody = document.getElementById('futureTableBody');
-      tbody.innerHTML = '';
 
-      if (futureData && futureData.dates && futureData.predictions) {
-        futureData.dates.forEach((date, index) => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-                        <td>${date}</td>
-                        <td style="color: #00ffe0; font-weight: 600;">$${futureData.predictions[index].toFixed(2)}</td>
-                    `;
-          tbody.appendChild(row);
+    // Analyze button
+    document.getElementById('analyzeBtn').addEventListener('click', async ()=>{
+      const ticker=document.getElementById('regimeTicker').value.trim().toUpperCase();
+      if(!ticker){alert('Enter a ticker');return;}
+      const start=document.getElementById('regimeStart').value;
+      const end=document.getElementById('regimeEnd').value;
+      const btn=document.getElementById('analyzeBtn');
+      const loading=document.getElementById('regimeLoading');
+      const loadingText=document.getElementById('regimeLoadingText');
+      const dashboard=document.getElementById('regimeDashboard');
+      btn.disabled=true; btn.textContent='Analyzing...';
+      loading.style.display='block'; dashboard.style.display='none';
+      if(loadingText) loadingText.textContent = `[Step 1/3] Downloading 3+ years of ${ticker} OHLCV price history...`;
+      
+      try {
+        const fetchPromise = fetch(`${API}/api/regime`,{method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ticker,start_date:start,end_date:end})});
+
+        setTimeout(()=>{ if(loadingText) loadingText.textContent = `[Step 2/3] Fitting K-Means (k=6) on 5D normalized feature vectors...`; }, 350);
+        setTimeout(()=>{ if(loadingText) loadingText.textContent = `[Step 3/3] Computing Cosine Distance & backtesting tactical strategy...`; }, 700);
+
+        const res = await fetchPromise;
+        if(!res.ok){const e=await res.json();throw new Error(e.error||`API ${res.status}`);}
+        const data=await res.json();
+        
+        // Small delay so user sees computational pipeline execution
+        await new Promise(r => setTimeout(r, 900));
+
+        displayRegime(data);
+        dashboard.scrollIntoView({behavior:'smooth',block:'start'});
+      } catch(e){alert(`Error: ${e.message}\n\nStart Flask: python app.py serve`);}
+      finally{btn.disabled=false;btn.textContent='Analyze Regime →';loading.style.display='none';}
+    });
+
+
+    // Prediction engine
+    let predChart=null;
+    document.getElementById('predictBtn').addEventListener('click', async ()=>{
+      const ticker=document.getElementById('predTicker').value.trim().toUpperCase();
+      const model=document.getElementById('predModel').value;
+      const start=document.getElementById('predStartDate').value;
+      const end=document.getElementById('predEndDate').value;
+      const seq=parseInt(document.getElementById('predSequence').value);
+      const epochs=parseInt(document.getElementById('predEpochs').value);
+      const batch=parseInt(document.getElementById('predBatch').value);
+      const future=parseInt(document.getElementById('predFuture').value);
+      if(!ticker){alert('Enter a ticker');return;}
+      const btn=document.getElementById('predictBtn');
+      const btxt=document.getElementById('predictBtnText');
+      const bar=document.getElementById('predProgress');
+      const fill=document.getElementById('predProgressFill');
+      const log=document.getElementById('statusLog');
+      btn.disabled=true; btxt.textContent='Training...';
+      bar.style.display='block'; log.style.display='block'; log.innerHTML=''; fill.style.width='8%';
+      const addLog=msg=>{const d=document.createElement('div');
+        d.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;
+        log.appendChild(d); log.scrollTop=log.scrollHeight;};
+      addLog(`Fetching ${ticker}...`); fill.style.width='18%';
+      try {
+        const res=await fetch(`${API}/api/predict`,{method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ticker,start_date:start,end_date:end,
+            sequence_length:seq,epochs,batch_size:batch,future_days:future,model,early_stopping:true})});
+        if(!res.ok) throw new Error(`API ${res.status}`);
+        fill.style.width='50%'; addLog(`Training ${model}...`);
+        const data=await res.json();
+        fill.style.width='80%'; addLog('Computing results...');
+        const m=data.metrics[model]||data.metrics.Ensemble;
+        document.getElementById('metricRMSE').textContent=m.RMSE.toFixed(4);
+        document.getElementById('metricMAE').textContent=m.MAE.toFixed(4);
+        document.getElementById('metricDA').textContent=m.Directional_Accuracy.toFixed(1)+'%';
+        document.getElementById('metricSharpe').textContent=data.backtest.metrics['Sharpe Ratio'].toFixed(2);
+        if(predChart) predChart.destroy();
+        predChart=new Chart(document.getElementById('predictionChart'),{
+          type:'line',
+          data:{labels:data.dates,datasets:[
+            {label:'Actual',data:data.actual,borderColor:'#8892a4',borderWidth:1.5,pointRadius:0,tension:.3},
+            {label:model,data:data.predictions[model]||data.predictions.Ensemble,borderColor:'#00ffe0',borderWidth:2,pointRadius:0,tension:.3},
+            {label:'Upper',data:data.confidence.upper,borderColor:'rgba(0,255,224,.2)',borderWidth:1,pointRadius:0,fill:'+1',tension:.3},
+            {label:'Lower',data:data.confidence.lower,borderColor:'rgba(0,255,224,.2)',borderWidth:1,pointRadius:0,fill:false,tension:.3}
+          ]},
+          options:{responsive:true,animation:false,
+            plugins:{legend:{labels:{color:'#e2e8f0',font:{size:11}}},
+              title:{display:true,text:`${ticker} — ${model}`,color:'#00ffe0'},
+              tooltip:{backgroundColor:'rgba(8,12,16,.95)',titleColor:'#00ffe0',bodyColor:'#e2e8f0',borderColor:'rgba(0,255,224,.2)',borderWidth:1}},
+            scales:{y:{ticks:{color:'#8892a4'},grid:{color:'rgba(0,255,224,0.07)'}},
+                    x:{ticks:{color:'#8892a4',maxTicksLimit:10},grid:{color:'rgba(0,255,224,0.07)'}}}}
         });
+        const tbody=document.getElementById('futureTableBody'); tbody.innerHTML='';
+        (data.future?.dates||[]).forEach((date,i)=>{
+          const tr=document.createElement('tr');
+          tr.innerHTML=`<td>${date}</td><td style="color:#00ffe0;font-weight:600">$${(data.future.predictions[i]||0).toFixed(2)}</td>`;
+          tbody.appendChild(tr);
+        });
+        document.getElementById('predictResults').style.display='block';
+        document.getElementById('predictPlaceholder').style.display='none';
+        fill.style.width='100%'; addLog('✓ Done!');
+        setTimeout(()=>{bar.style.display='none';fill.style.width='0';},2000);
+        document.getElementById('predictResults').scrollIntoView({behavior:'smooth'});
+      } catch(e){addLog(`✗ ${e.message}`);alert(`Error: ${e.message}\n\nStart Flask: python app.py serve`);}
+      finally{btn.disabled=false;btxt.textContent='Train & Analyze';}
+    });
+
+    // Switcher for Interactive Architecture Explorer Tabs
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => btn.getAttribute('onclick').includes(tabId));
+      if(activeBtn) activeBtn.classList.add('active');
+      const targetPane = document.getElementById(`tab-${tabId}`);
+      if(targetPane) targetPane.classList.add('active');
+    }
+
+    // Theme Switcher (Dark / Light Mode)
+    const themeBtn = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+    const themeText = document.getElementById('themeText');
+
+    function setTheme(mode) {
+      if (mode === 'light') {
+        document.body.classList.add('light-mode');
+        themeIcon.textContent = '☀️';
+        themeText.textContent = 'Light';
+        localStorage.setItem('theme', 'light');
+      } else {
+        document.body.classList.remove('light-mode');
+        themeIcon.textContent = '🌙';
+        themeText.textContent = 'Dark';
+        localStorage.setItem('theme', 'dark');
       }
     }
 
-    // Load Chart.js library
-    if (typeof Chart === 'undefined') {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js';
-      document.head.appendChild(script);
+    if(themeBtn) {
+      themeBtn.addEventListener('click', () => {
+        const isLight = document.body.classList.contains('light-mode');
+        setTheme(isLight ? 'dark' : 'light');
+      });
+    }
+
+    // Check saved theme
+    if (localStorage.getItem('theme') === 'light') {
+      setTheme('light');
+    }
+
+    // Pipeline Terminal Inspector Data & Handler (Visual Specs & Data Flow - ZERO CODE)
+    const pipelineStepsData = {
+      1: {
+        filename: "STAGE_01_SPEC.json",
+        badge: "Stage 01: Data Ingestion",
+        heading: "yfinance OHLCV Historical Fetch",
+        desc: "Fetches historical daily market data (Open, High, Low, Close, Volume) over specified date ranges. Memory caching prevents redundant API calls.",
+        input: "Global Ticker (e.g. AAPL)",
+        process: "API Fetch & Local Cache",
+        output: "OHLCV Price Array",
+        p1_key: "Data Source", p1_val: "yfinance API",
+        p2_key: "Frequency", p2_val: "Daily Close",
+        p3_key: "Lookback", p3_val: "3+ Years History",
+        p4_key: "Data Integrity", p4_val: "Split Adjusted"
+      },
+      2: {
+        filename: "STAGE_02_SPEC.json",
+        badge: "Stage 02: Preprocessing",
+        heading: "IQR Outlier Filtering & Winsorizing",
+        desc: "Strips abnormal single-day price glitches and flash-crash spikes using Interquartile Range (IQR) bounds to keep feature scaling robust.",
+        input: "Raw Price Series",
+        process: "1.5x IQR Filter & Winsorize",
+        output: "Clipped Log Returns r_t",
+        p1_key: "Filter Method", p1_val: "Interquartile Range",
+        p2_key: "Threshold", p2_val: "1.5x IQR Bounds",
+        p3_key: "Metric", p3_val: "Log Return r_t",
+        p4_key: "Outlier Action", p4_val: "Winsorized Capping"
+      },
+      3: {
+        filename: "STAGE_03_SPEC.json",
+        badge: "Stage 03: Feature Engineering",
+        heading: "5-Dimensional Technical Feature Extraction",
+        desc: "Constructs normalized feature vectors combining RSI(14) deviation, EMA20 slope, MACD histogram, 20-day volatility, and 10-day return momentum.",
+        input: "Log Returns r_t",
+        process: "5D Indicator Extraction",
+        output: "Feature Vector Matrix v_t",
+        p1_key: "Vector Space", p1_val: "5-Dimensional",
+        p2_key: "Scaling", p2_val: "StandardScaler",
+        p3_key: "Indicators", p3_val: "RSI, EMA, MACD, Vol",
+        p4_key: "Normalization", p4_val: "Zero Mean / Unit Var"
+      },
+      4: {
+        filename: "STAGE_04_SPEC.json",
+        badge: "Stage 04: K-Means Clustering",
+        heading: "Unsupervised Market Regime Discovery",
+        desc: "Scales feature vectors with StandardScaler and fits 6 cluster centroids using n_init=20 to discover market regimes naturally.",
+        input: "Scaled Feature Matrix",
+        process: "K-Means (k=6, n_init=20)",
+        output: "6 Regime Labels (0–5)",
+        p1_key: "Algorithm", p1_val: "Lloyd K-Means",
+        p2_key: "Cluster Count", p2_val: "k = 6 Regimes",
+        p3_key: "Random Inits", p3_val: "n_init = 20",
+        p4_key: "Regime Types", p4_val: "Bull / Bear / Neutral / Stress"
+      },
+      5: {
+        filename: "STAGE_05_SPEC.json",
+        badge: "Stage 05: Risk Condition Score",
+        heading: "0–10 Risk Composite Score Engine",
+        desc: "Combines volatility expansion, momentum extremity, and trend alignment into a composite 0-10 score, smoothed with a 5-day rolling mean.",
+        input: "Volatility & RSI Signals",
+        process: "Weighted Divergence Index",
+        output: "0–10 Score & Alert Tier",
+        p1_key: "Score Range", p1_val: "0.0 to 10.0 Index",
+        p2_key: "Smoothing", p2_val: "5-Day Rolling SMA",
+        p3_key: "Alert Tiers", p3_val: "Favorable / Watch / Risk",
+        p4_key: "Primary Driver", p4_val: "20d Volatility Std"
+      },
+      6: {
+        filename: "STAGE_06_SPEC.json",
+        badge: "Stage 06: Vector Cosine Search",
+        heading: "k-NN Scenario Matching (100% Real History)",
+        desc: "Measures Cosine Distance between today's feature vector and every historical trading day to return the top 5 most similar past scenarios.",
+        input: "Today's Feature Vector",
+        process: "Cosine Similarity Matrix",
+        output: "Top-5 Historical Dates",
+        p1_key: "Distance Metric", p1_val: "Cosine Angle cos(θ)",
+        p2_key: "Match Count", p2_val: "Top 5 Nearest Neighbors",
+        p3_key: "Forward Window", p3_val: "10-Day Trajectory",
+        p4_key: "Data Guarantee", p4_val: "100% Real yfinance Data"
+      },
+      7: {
+        filename: "STAGE_07_SPEC.json",
+        badge: "Stage 07: Quant Strategy Backtest",
+        heading: "Tactical Allocation Strategy vs. Buy & Hold",
+        desc: "Simulates regime-based tactical allocation (100% Bullish, 50% Neutral, 0% Bear) against Buy & Hold benchmark on real historical equity curves.",
+        input: "Regime Time-Series",
+        process: "Tactical Equity Simulation",
+        output: "CAGR, Sharpe & Max Drawdown",
+        p1_key: "Base Capital", p1_val: "$10,000 Portfolio",
+        p2_key: "Benchmark", p2_val: "Buy & Hold Equity",
+        p3_key: "Risk Management", p3_val: "0% Exposure in Stress",
+        p4_key: "Evaluated By", p4_val: "Sharpe Ratio & MDD"
+      }
+    };
+
+    function inspectStep(stepNum) {
+      document.querySelectorAll('.step-node').forEach(node => node.classList.remove('active'));
+      const activeNode = document.querySelectorAll('.step-node')[stepNum - 1];
+      if(activeNode) activeNode.classList.add('active');
+
+      const data = pipelineStepsData[stepNum];
+      if(!data) return;
+      document.getElementById('inspectorStepTitle').textContent = data.filename;
+      document.getElementById('inspectorBadge').textContent = data.badge;
+      document.getElementById('inspectorHeading').textContent = data.heading;
+      document.getElementById('inspectorDesc').textContent = data.desc;
+
+      document.getElementById('flowInput').textContent = data.input;
+      document.getElementById('flowProcess').textContent = data.process;
+      document.getElementById('flowOutput').textContent = data.output;
+
+      document.getElementById('p1Key').textContent = data.p1_key;
+      document.getElementById('p1Val').textContent = data.p1_val;
+      document.getElementById('p2Key').textContent = data.p2_key;
+      document.getElementById('p2Val').textContent = data.p2_val;
+      document.getElementById('p3Key').textContent = data.p3_key;
+      document.getElementById('p3Val').textContent = data.p3_val;
+      document.getElementById('p4Key').textContent = data.p4_key;
+      document.getElementById('p4Val').textContent = data.p4_val;
+    }
+
+    // Hero Quick Runner Helpers
+    function quickHeroRun(symbol) {
+      document.getElementById('heroTickerInput').value = symbol;
+      executeHeroRun();
+    }
+
+    function executeHeroRun() {
+      const ticker = (document.getElementById('heroTickerInput').value || 'AAPL').trim().toUpperCase();
+      document.getElementById('tickerInput').value = ticker;
+      // Trigger regime analysis if fetchRegimeData is available
+      if (typeof fetchRegimeData === 'function') {
+        fetchRegimeData();
+      }
+    }
+
+    // Quick Date Range Shortcuts (1Y, 3Y, 5Y, 10Y, 15Y)
+    function setQuickRange(years) {
+
+      const today = new Date();
+      const pastDate = new Date(today.getFullYear() - years, today.getMonth(), today.getDate());
+      const formatted = pastDate.toISOString().split('T')[0];
+      document.getElementById('regimeStart').value = formatted;
+      
+      document.querySelectorAll('.pill-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.trim() === (years + 'Y'));
+      });
+    }
+
+    // Horizontal Interactive Circuit Node Switching Logic
+    const circuitStages = {
+      1: {
+        progress: "16%",
+        event: "[EVENT: USER_CLICK_ANALYZE_REGIME]",
+        tag: "PHASE 01 OF 06",
+        title: "01. Real-Time Market Data Ingestion Pipeline",
+        desc: "Upon receiving a ticker query, the Flask server initiates a synchronous HTTPS fetch to the Yahoo Finance API to retrieve historical OHLCV bar series across specified start and end timestamps.",
+        input: "Ticker, Start/End Date",
+        process: "RESTful yfinance API Stream",
+        output: "Raw OHLCV DataFrame"
+      },
+      2: {
+        progress: "33%",
+        event: "[EVENT: COMPUTE_FEATURE_MATRIX]",
+        tag: "PHASE 02 OF 06",
+        title: "02. Quantitative Signal Feature Extraction",
+        desc: "Computes 5 non-linear technical features per bar: RSI(14) deviation from neutral 50, 20-day annualized log-return volatility standard deviation, Exponential Moving Average (EMA20) slope vector, MACD histogram divergence, and 10-day price momentum.",
+        input: "Raw OHLCV Bar Series",
+        process: "StandardScaler Vector Scaling",
+        output: "Normalized 5D Feature Matrix"
+      },
+      3: {
+        progress: "50%",
+        event: "[EVENT: EXECUTE_KMEANS_CLUSTERING]",
+        tag: "PHASE 03 OF 06",
+        title: "03. Unsupervised K-Means Regime Classification",
+        desc: "Fits 6 cluster centroids using Lloyd's algorithm with 20 random initializations (n_init=20). Maps historical vectors into 6 distinct regime labels ranging from Bullish Recovery to Structural Bear Stress.",
+        input: "Scaled Feature Vectors",
+        process: "Lloyd K-Means (k=6, n_init=20)",
+        output: "6 Regime Labels & Risk Score"
+      },
+      4: {
+        progress: "66%",
+        event: "[EVENT: COSINE_SCENARIO_SEARCH]",
+        tag: "PHASE 04 OF 06",
+        title: "04. Nearest-Neighbor Vector Scenario Matching",
+        desc: "Calculates the Cosine Distance matrix product between today's feature vector and every historical trading bar to return the top 5 nearest historical market states and their 10-day forward trajectories.",
+        input: "Current 5D Feature Vector",
+        process: "Cosine Angle Matrix Dot Product",
+        output: "Top-5 Historical Matches"
+      },
+      5: {
+        progress: "83%",
+        event: "[EVENT: STRATEGY_EQUITY_SIMULATION]",
+        tag: "PHASE 05 OF 06",
+        title: "05. Tactical Allocation Backtest Engine",
+        desc: "Simulates a dynamic tactical portfolio allocation ($10,000 initial capital) that shifts exposure to 100% Cash during High Stress regimes and 100% Equity during Bullish Regimes, evaluating performance against Buy & Hold benchmark.",
+        input: "Regime Time-Series",
+        process: "Tactical Equity Curve Simulation",
+        output: "Sharpe Ratio, CAGR & Max Drawdown"
+      },
+      6: {
+        progress: "100%",
+        event: "[EVENT: USER_CLICK_TRAIN_SIGNAL_MODEL]",
+        tag: "PHASE 06 OF 06",
+        title: "06. Neural Network Directional Benchmarking",
+        desc: "Trains PyTorch/TensorFlow deep learning architectures (LSTM, GRU, Transformer) on historical log returns using Huber Loss and Adam optimizer (lr=0.001) to evaluate out-of-sample directional signal accuracy.",
+        input: "Log Return Sequences",
+        process: "LSTM / GRU / Self-Attention",
+        output: "Out-of-Sample DA & Metrics"
+      }
+    };
+
+    function switchCircuitNode(num) {
+      document.querySelectorAll('.circuit-node').forEach((node, idx) => {
+        node.classList.toggle('active', idx === (num - 1));
+      });
+      const data = circuitStages[num];
+      if(!data) return;
+      document.getElementById('circuitProgress').style.width = data.progress;
+      document.getElementById('circuitEvent').textContent = data.event;
+      document.getElementById('circuitStageTag').textContent = data.tag;
+      document.getElementById('circuitTitle').textContent = data.title;
+      document.getElementById('circuitDesc').textContent = data.desc;
+      document.getElementById('circuitInput').textContent = data.input;
+      document.getElementById('circuitProcess').textContent = data.process;
+      document.getElementById('circuitOutput').textContent = data.output;
+    }
+
+
+
+    // High-Performance Interactive Animation Engine (Guaranteed 60fps Reveal)
+    function initAnimations() {
+      const observerOptions = { threshold: 0.05, rootMargin: '0px 0px 50px 0px' };
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('reveal-visible');
+          }
+        });
+      }, observerOptions);
+
+      document.querySelectorAll('.reveal, .chart-card, .metric-box, .tech-chip, .faq-item, .nn-workspace-console, .regime-command-console, .studio-footer').forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+        // Fallback: If element is already in viewport, make visible immediately
+        const rect = el.getBoundingClientRect();
+        if (rect.top < window.innerHeight) {
+          el.classList.add('reveal-visible');
+        }
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initAnimations);
+    } else {
+      initAnimations();
     }
   </script>
-</body>
 
+
+
+
+
+</body>
 </html>

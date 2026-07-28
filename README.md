@@ -1,74 +1,46 @@
-# StockPred - AI-Powered Stock Price Prediction
+# StockBuddy Atelier — Quantitative Market Intelligence Engine
 
-A comprehensive stock price prediction platform using deep learning models (LSTM, GRU, Transformer) with a modern HTML frontend and Flask API backend.
+StockBuddy Atelier is an institutional-grade quantitative finance platform built with Flask, scikit-learn, PyTorch/TensorFlow, and a visual terminal inspector. It processes multi-decade historical market datasets via live `yfinance` pipelines to discover market regimes, run vector cosine scenario matching, and backtest tactical quantitative allocations in real-time.
 
-## Quick Start
+---
 
-1. **Start the Application**
+## ⚡ Key Engineering Features
+
+- **Unsupervised K-Means Market Regime Discovery ($k=6$)**:
+  - Classifies market conditions (Bullish Recovery, Momentum Breakout, Overbought Sideways, Volatile Neutral, Cyclical Pullback, Structural Bear Stress) using scaled feature vectors (RSI, 20d Volatility, EMA Slope, MACD Histogram).
+- **Interactive Terminal Pipeline Inspector (7-Stage Spec Console)**:
+  - Transparent visual data flow (`Input ➔ Process ➔ Output`) and parameter matrices detailing every step from data ingestion to quantitative portfolio backtesting.
+- **Vector Nearest-Neighbor Scenario Matching ($k$-NN)**:
+  - Computes Cosine Distance matrix dot products across 15+ years of daily technical vectors to return the top 5 historical market scenarios matching today's condition.
+- **Tactical Allocation Strategy Backtester**:
+  - Simulates dynamic equity curve allocations (100% Bull, 50% Neutral, 0% Bear) against Buy & Hold benchmark on $10,000 portfolio base.
+- **Deep Learning Neural Signal Studio**:
+  - Out-of-sample directional signal benchmarking using LSTM, GRU, and Transformer self-attention architectures trained on log returns $r_t = \ln(P_t / P_{t-1})$.
+- **Quick Date Range Selection & Downsampling**:
+  - Supports 1Y, 3Y, 5Y, 10Y, 15Y historical shortcuts with dynamic 500-point timeline downsampling for zero-latency UI rendering.
+
+---
+
+## 🛠️ Technology Stack
+
+- **Backend**: Python 3.x, Flask REST API, Pandas, NumPy, scikit-learn, yfinance
+- **Deep Learning**: TensorFlow / PyTorch (LSTM, GRU, Transformer)
+- **Frontend**: Vanilla JS (ES6+), Modern Vanilla CSS, Chart.js 4, Google Fonts (Outfit, Inter, JetBrains Mono)
+- **Architecture**: Decoupled RESTful API + Reactive Atelier Dashboard
+
+---
+
+## 🚀 Quickstart
+
+1. **Install Dependencies**:
    ```bash
-   start.bat
+   pip install flask pandas numpy scikit-learn yfinance tensorflow
    ```
-   This will:
-   - Start the Flask API backend on port 5000
-   - Start the HTML frontend on port 8080
-   - Automatically open your browser to http://localhost:8080
 
-2. **Use the Application**
-   - The browser will automatically open to http://localhost:8080
-   - Navigate to the "Predict" section
-   - Enter a stock ticker (e.g., AAPL, GOOGL, TSLA)
-   - Set start and end dates for training data
-   - Choose a model (LSTM, GRU, or Transformer)
-   - Configure training parameters (epochs, batch size, sequence length)
-   - Click "Train & Predict" to start training
-   - View real-time training progress and logs
-   - Analyze predictions with interactive charts, confidence intervals, and metrics
-   - See future price forecasts in a detailed table
+2. **Launch Application**:
+   ```bash
+   python app.py
+   ```
 
-## Features
-
-- **Real-time Data Fetching**: Uses yfinance to get stock data
-- **Multiple AI Models**: LSTM, GRU, and Transformer architectures
-- **Live Prediction Engine**: Interactive web interface to train models and predict stock prices
-- **Technical Indicators**: RSI, EMA, MACD calculations
-- **Ensemble Predictions**: Combines multiple models for better accuracy
-- **Confidence Intervals**: Shows prediction uncertainty
-- **Backtesting**: Evaluates strategy performance with metrics
-- **Interactive Charts**: Visualizes predictions and results with Chart.js
-- **Future Forecasting**: Predicts next N days with detailed tables
-
-## Architecture
-
-- **Frontend**: Modern HTML5 with Chart.js for visualizations
-- **Backend**: Flask API with TensorFlow/Keras for deep learning
-- **Data**: yfinance for real-time stock data fetching
-- **Models**: Custom LSTM, GRU, and Transformer implementations
-
-## API Endpoints
-
-- `GET /api/health` - Health check
-- `POST /api/predict` - Train models and get predictions
-
-## Requirements
-
-- Python 3.7+
-- TensorFlow 2.x
-- Flask
-- yfinance
-- pandas, numpy, scikit-learn
-- matplotlib (for backend plotting)
-
-## Troubleshooting
-
-If you encounter issues:
-1. Ensure all Python dependencies are installed
-2. Check that ports 5000 and 8080 are available
-3. Verify TensorFlow is working: `python -c "import tensorflow; print(tensorflow.__version__)"`
-4. Check the console output in both command windows for error messages
-
-## Usage Tips
-
-- Use recent date ranges (last 2-5 years) for better model performance
-- LSTM works well for longer sequences, GRU is faster
-- Transformer model may take longer to train but can capture complex patterns
-- Check the confidence intervals to understand prediction uncertainty
+3. **Access Dashboard**:
+   Open browser at `http://localhost:8080` (or target host port).
