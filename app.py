@@ -1,19 +1,28 @@
 """
-Stock price prediction pipeline
+StockBuddy — Quantitative Market Intelligence Engine
+Phase 1: Statistical Corrections (data leakage, Sharpe Rf, transaction costs, walk-forward)
+Phase 2: Production ML Pipeline (model registry, async training, disk persistence,
+         inference cache, auto-retraining scheduler, config management)
 
-Self-contained script that:
-1) Fetches market data via yfinance
-2) Engineers technical indicators and scales features
-3) Creates sequences for supervised learning
-4) Trains LSTM, GRU, and a light Transformer model
-5) Evaluates, ensembles, and backtests
+v1 API routes  → /api/regime, /api/predict, /api/wf_validate   (unchanged, backward compat)
+v2 API routes  → /api/v2/*                                       (Phase 2 additions)
 """
 
 import os
+import sys
 import math
+import logging
 import datetime
 import warnings
 warnings.filterwarnings('ignore')
+
+# Configure structured logging before anything else
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+log = logging.getLogger('stockbuddy')
 
 import numpy as np
 import pandas as pd
@@ -34,6 +43,14 @@ from tensorflow.keras import mixed_precision
 # API server
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+
+# ── Phase 2: Production ML infrastructure ─────────────────────────────────────
+from core.config       import CFG
+from ml.registry       import ModelRegistry
+from ml.trainer        import BackgroundTrainer
+from ml.inference      import InferenceCache, InferenceEngine
+from ml.scheduler      import RetrainingScheduler
+from storage.model_store import ModelStore
 
 # --------------------------
 # Configuration
@@ -1143,294 +1160,412 @@ def main():
 
 
 if __name__ == '__main__':
-    import sys
-    # If started with `python app.py serve`, run API server; otherwise run CLI pipeline
-    if len(sys.argv) > 1 and sys.argv[1].lower() in {"serve", "server", "api"}:
-        app = Flask(__name__)
-        CORS(app)
-
-        @app.route('/api/health', methods=['GET'])
-        def health():
-            # BUG-05: Report cache status so users know if models are warm
-            return jsonify({
-                'status': 'ok',
-                'cached_models': len(MODEL_CACHE),
-                'cache_keys': list(MODEL_CACHE.keys()),
-                'phase': 'Phase-1-Statistical-Corrections',
-            })
-
-        @app.route('/api/regime', methods=['POST'])
-        def api_regime():
-            payload = request.get_json(force=True) or {}
-            ticker = payload.get('ticker', 'AAPL').upper()
-            # Default: 3 years of data for robust regime history
-            three_years_ago = (datetime.date.today() - datetime.timedelta(days=3*365)).isoformat()
-            start = payload.get('start_date', three_years_ago)
-            end   = payload.get('end_date', datetime.date.today().isoformat())
-
-            def safe_scalar(v):
-                if v is None: return None
-                if isinstance(v, (np.floating, np.integer)): v = v.item()
-                if isinstance(v, float) and (math.isnan(v) or math.isinf(v)): return None
-                return v
-
-            try:
-                raw = fetch_data_yfinance(ticker, start, end)
-                raw = preprocess_data(raw)
-                df  = engineer_features(raw)
-            except Exception as e:
-                return jsonify({'error': str(e)}), 400
-
-            # Classify regimes
-            labels, feat = classify_regimes(df, n_clusters=6)
-
-            # Risk score on engineered df, aligned to label dates
-            df_aligned = df.loc[df.index.intersection(labels.index)]
-            risk_scores = compute_risk_score(df_aligned, labels)
-            risk_scores = risk_scores.reindex(labels.index).ffill().fillna(5.0)
-
-            # Regime stats
-            regime_stats = compute_regime_stats(df_aligned, labels)
-
-            # Current state
-            current_regime_id   = int(labels.iloc[-1])
-            current_risk_score  = float(safe_scalar(risk_scores.iloc[-1]) or 5.0)
-            current_alert       = get_condition_alert(current_risk_score, current_regime_id)
-            current_profile     = REGIME_PROFILES[current_regime_id]
-            latest_row          = df.iloc[-1]
-
-            indicators = {
-                'rsi':        safe_scalar(latest_row['RSI14']),
-                'ema20':      safe_scalar(latest_row['EMA20']),
-                'macd':       safe_scalar(latest_row['MACD']),
-                'macd_hist':  safe_scalar(latest_row['MACD_hist']),
-                'close':      safe_scalar(latest_row['Close']),
-                'logret':     safe_scalar(latest_row['LogReturn']),
-            }
-
-            # Timeline: sample every N days if long, otherwise keep all
-            timeline_dates  = labels.index
-            sample_step = max(1, len(timeline_dates) // 500)  # cap at 500 points for JSON size
-            sampled_idx = list(range(0, len(timeline_dates), sample_step))
-            if sampled_idx[-1] != len(timeline_dates) - 1:
-                sampled_idx.append(len(timeline_dates) - 1)
-
-            price_close = df_aligned['Close']
-            timeline = []
-            for i in sampled_idx:
-                d = timeline_dates[i]
-                rid = int(labels.iloc[i])
-                rs  = safe_scalar(risk_scores.iloc[i])
-                close_val = safe_scalar(price_close.get(d, None))
-                timeline.append({
-                    'date':         d.strftime('%Y-%m-%d'),
-                    'regime_id':    rid,
-                    'regime_name':  REGIME_PROFILES[rid]['name'],
-                    'regime_color': REGIME_PROFILES[rid]['color'],
-                    'risk_score':   rs,
-                    'close':        close_val,
-                })
-
-            # Serialize regime_stats safely
-            def safe_stat(s):
-                return {k: (safe_scalar(v) if not isinstance(v, (list, dict)) else v)
-                        for k, v in s.items()}
-
-            stats_out = {}
-            for rid, s in regime_stats.items():
-                stats_out[str(rid)] = {
-                    'id':          s['id'],
-                    'name':        s['name'],
-                    'color':       s['color'],
-                    'description': s['description'],
-                    'total_days':  s['total_days'],
-                    'fwd_5d':      safe_stat(s['fwd_5d']),
-                    'fwd_10d':     safe_stat(s['fwd_10d']),
-                    'fwd_20d':     safe_stat(s['fwd_20d']),
-                }
-
-            # Vector Nearest-Neighbor Scenario Matching (Cosine Similarity on 100% Real Historical Data)
-            similar_matches = find_similar_historical_scenarios(df_aligned, feat, labels, top_k=5)
-
-            # Quantitative Regime Strategy vs. Buy & Hold Benchmark on Real Historical Data
-            quant_backtest = compute_quant_backtest(df_aligned, labels)
-
-            return jsonify({
-                'ticker':             ticker,
-                'current_regime': {
-                    'id':              current_regime_id,
-                    'name':            current_profile['name'],
-                    'color':           current_profile['color'],
-                    'description':     current_profile['description'],
-                },
-                'risk_score':        round(current_risk_score, 2),
-                'alert':             current_alert,
-                'indicators':        indicators,
-                'regime_stats':      stats_out,
-                'timeline':          timeline,
-                'similar_matches':   similar_matches,
-                'quant_backtest':    quant_backtest,
-            })
-
-
-        @app.route('/api/predict', methods=['POST'])
-        def api_predict():
-            payload     = request.get_json(force=True) or {}
-            ticker      = payload.get('ticker', CONFIG['ticker']).upper()
-            start       = payload.get('start_date', CONFIG['start_date'])
-            end         = payload.get('end_date', CONFIG['end_date'])
-            seq_len     = int(payload.get('sequence_length', CONFIG['sequence_length']))
-            epochs      = int(payload.get('epochs', CONFIG['epochs']))
-            batch_size  = int(payload.get('batch_size', CONFIG['batch_size']))
-            future_days = int(payload.get('future_days', 5))
-            force_retrain = bool(payload.get('force_retrain', False))
-
-            # BUG-05: Cache key encodes all training hyperparameters that affect
-            # model weights so stale caches are never reused after config changes.
-            cache_key = f"{ticker}_{start}_{end}_{seq_len}_{epochs}"
-            selected  = payload.get('model')
-            selected_list = [selected] if selected in {'LSTM', 'GRU', 'Transformer'} else None
-            use_es = bool(payload.get('early_stopping', True))
-
-            # BUG-01+02: prepare_data now returns RAW arrays; scaling is deferred to split_and_scale_data
-            data = prepare_data(ticker, start, end, seq_len)
-            splits = split_and_scale_data(
-                data['X_raw'], data['y_raw'], data['dates_raw'], data['base_prices_raw'],
-                CONFIG['train_split'], CONFIG['val_split'], seq_len
-            )
-            scaler_y = splits['scaler_y']
-            scaler_X = splits['scaler_X']
-
-            input_shape = (seq_len, data['X_raw'].shape[1])
-
-            # BUG-05: Serve from cache if available and not force-retraining
-            if cache_key in MODEL_CACHE and not force_retrain:
-                print(f"[CACHE HIT] Serving cached model for key: {cache_key}")
-                models_dict = MODEL_CACHE[cache_key]['models']
-                from_cache  = True
-            else:
-                print(f"[CACHE MISS] Training fresh model for key: {cache_key}")
-                models_dict = train_models(splits, input_shape, epochs, batch_size,
-                                           selected_models=selected_list, use_early_stopping=use_es)
-                # Store in cache: only the Keras model references (weights are in-memory)
-                MODEL_CACHE[cache_key] = {
-                    'models':     models_dict,
-                    'scaler_X':   scaler_X,
-                    'scaler_y':   scaler_y,
-                    'trained_at': datetime.datetime.utcnow().isoformat(),
-                    'cache_key':  cache_key,
-                }
-                from_cache = False
-
-            eval_results = evaluate_and_ensemble(models_dict, splits, scaler_y)
-
-            # BUG-07: run_backtest Sharpe also uses risk-free rate
-            rf_daily = CONFIG['risk_free_rate_annual'] / 252.0
-            backtest = run_backtest(
-                eval_results['predictions']['Ensemble'],
-                eval_results['y_test_actual'],
-                eval_results['dates_test'],
-                float(payload.get('initial_capital', CONFIG['initial_capital']))
-            )
-
-            # Multi-step forecast using the last sequence from the TEST partition
-            def roll_forecast(mdls, last_seq, steps, sy, sx, close_idx, last_price):
-                seq   = last_seq.copy().astype(np.float32)
-                price = float(last_price)
-                preds = []
-                for _ in range(steps):
-                    lrs = []
-                    for name, mdl in mdls.items():
-                        if name.endswith('_history'): continue
-                        yhat_s = mdl.predict(seq[np.newaxis, ...], verbose=0).ravel()[0]
-                        logret = sy.inverse_transform([[yhat_s]])[0, 0]
-                        lrs.append(logret)
-                    avg_lr    = float(np.mean(lrs))
-                    next_price = price * float(np.exp(avg_lr))
-                    preds.append(next_price)
-                    price = next_price
-                    seq = np.roll(seq, -1, axis=0)
-                    seq[-1, close_idx] = scale_single_feature(next_price, sx, close_idx)
-                return preds
-
-            # Use last test sequence as seed for the autoregressive forecast
-            X_te_seq = splits['test'][0]
-            last_seq  = X_te_seq[-1] if len(X_te_seq) > 0 else splits['train'][0][-1]
-            last_price = float(eval_results['y_test_actual'][-1])
-            future_forecast = roll_forecast(
-                models_dict, last_seq, future_days, scaler_y, scaler_X,
-                data['close_feature_index'], last_price
-            )
-            last_date    = eval_results['dates_test'][-1]
-            future_dates = [(last_date + pd.Timedelta(days=i+1)).strftime('%Y-%m-%d')
-                            for i in range(future_days)]
-
-            # JSON serialization helpers
-            def safe_scalar(v):
-                if v is None: return None
-                if isinstance(v, (np.floating, np.integer)): v = v.item()
-                if isinstance(v, float) and (math.isnan(v) or math.isinf(v)): return None
-                return v
-            def safe_list(a): return [safe_scalar(v) for v in a]
-
-            response = {
-                'ticker':      ticker,
-                'from_cache':  from_cache,
-                'cache_key':   cache_key,
-                'dates':       [d.strftime('%Y-%m-%d') for d in eval_results['dates_test']],
-                'actual':      safe_list(eval_results['y_test_actual']),
-                'predictions': {k: safe_list(v) for k, v in eval_results['predictions'].items()},
-                'confidence': {
-                    'lower': safe_list(eval_results['confidence_intervals'][0]),
-                    'upper': safe_list(eval_results['confidence_intervals'][1])
-                },
-                'metrics': {k: {mk: safe_scalar(mv) for mk, mv in md.items()}
-                            for k, md in eval_results['metrics'].items()},
-                'backtest': {
-                    'equity':       safe_list(backtest['equity']),
-                    'buy_signals':  safe_list(backtest['buy_signals']),
-                    'sell_signals': safe_list(backtest['sell_signals']),
-                    'metrics':      {mk: safe_scalar(mv) for mk, mv in backtest['metrics'].items()}
-                },
-                'future': {
-                    'dates':       future_dates,
-                    'predictions': safe_list(future_forecast)
-                }
-            }
-            histories = {
-                k.replace('_history', ''): {hk: safe_list(hv) for hk, hv in h.items()}
-                for k, h in models_dict.items() if k.endswith('_history')
-            }
-            response['histories'] = histories
-            return jsonify(response)
-
-
-        @app.route('/api/wf_validate', methods=['POST'])
-        def api_wf_validate():
-            """
-            BUG-04 endpoint: Walk-Forward Validation.
-            POST body: { ticker, start_date, end_date, n_folds, model, epochs }
-            Returns per-fold and summary metrics.
-            Note: This is a heavy call (trains N models). Use sparingly.
-            """
-            payload    = request.get_json(force=True) or {}
-            ticker     = payload.get('ticker', 'AAPL').upper()
-            start      = payload.get('start_date', CONFIG['start_date'])
-            end        = payload.get('end_date', CONFIG['end_date'])
-            n_folds    = int(payload.get('n_folds', 5))
-            model_type = payload.get('model', 'GRU')
-            epochs     = int(payload.get('epochs', 10))
-            batch_size = int(payload.get('batch_size', 32))
-            try:
-                result = walk_forward_validate(
-                    ticker, start, end,
-                    n_folds=n_folds, model_type=model_type,
-                    epochs=epochs, batch_size=batch_size
-                )
-                return jsonify(result)
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-
-        app.run(host='0.0.0.0', port=5000, debug=False)
+    import sys as _sys
+    if len(_sys.argv) > 1 and _sys.argv[1].lower() in {"serve", "server", "api"}:
+        _run_server()
     else:
         main()
+
+
+def _run_server():
+    """Initialize Phase 2 infrastructure and start the Flask server."""
+
+    # ── Initialize Phase 2 components ──────────────────────────────────────────
+    store          = ModelStore(base_dir=CFG.model_artifacts_dir)
+    registry       = ModelRegistry(registry_path=CFG.registry_path)
+    cache          = InferenceCache(cache_dir=CFG.cache_dir,
+                                   ttl_seconds=CFG.inference_cache_ttl_s)
+    trainer        = BackgroundTrainer(registry, store, CFG,
+                                      max_workers=CFG.max_worker_threads)
+    engine         = InferenceEngine(registry, store, cache, CFG)
+    scheduler      = RetrainingScheduler(registry, trainer, engine, CFG)
+
+    scheduler.start()
+    log.info("Phase 2 ML infrastructure initialized")
+    log.info(f"Model artifacts dir : {CFG.model_artifacts_dir}")
+    log.info(f"Registry path       : {CFG.registry_path}")
+
+    # ── Flask App ──────────────────────────────────────────────────────────────
+    flask_app = Flask(__name__)
+    CORS(flask_app)
+
+    # ── Shared safe_scalar helper ──────────────────────────────────────────────
+    def _ss(v):
+        if v is None: return None
+        if isinstance(v, (float,)) and (math.isnan(v) or math.isinf(v)): return None
+        return v
+
+    # ═══════════════════════════════════════
+    # v1 routes (Phase 1 — unchanged)
+    # ═══════════════════════════════════════
+
+    @flask_app.route('/api/health', methods=['GET'])
+    def health():
+        return jsonify({
+            'status':         'ok',
+            'phase':          'Phase-2-Production-Pipeline',
+            'cached_models':  len(MODEL_CACHE),
+            'registry_stats': registry.stats(),
+            'scheduler':      scheduler.status(),
+            'artifact_store': {
+                'disk_bytes': store.disk_usage_bytes(),
+                'dir':        CFG.model_artifacts_dir,
+            },
+            'inference_cache': cache.stats(),
+        })
+
+    @flask_app.route('/api/regime', methods=['POST'])
+    def api_regime():
+        payload = request.get_json(force=True) or {}
+        ticker = payload.get('ticker', 'AAPL').upper()
+        three_years_ago = (datetime.date.today() - datetime.timedelta(days=3*365)).isoformat()
+        start = payload.get('start_date', three_years_ago)
+        end   = payload.get('end_date', datetime.date.today().isoformat())
+
+        def safe_scalar(v):
+            if v is None: return None
+            if isinstance(v, (float, int)) and isinstance(v, float) and (math.isnan(v) or math.isinf(v)): return None
+            return v
+
+        try:
+            raw = fetch_data_yfinance(ticker, start, end)
+            raw = preprocess_data(raw)
+            df  = engineer_features(raw)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 400
+
+        labels, feat = classify_regimes(df, n_clusters=6)
+        df_aligned   = df.loc[df.index.intersection(labels.index)]
+        risk_scores  = compute_risk_score(df_aligned, labels)
+        risk_scores  = risk_scores.reindex(labels.index).ffill().fillna(5.0)
+        regime_stats = compute_regime_stats(df_aligned, labels)
+
+        current_regime_id  = int(labels.iloc[-1])
+        current_risk_score = float(risk_scores.iloc[-1] or 5.0)
+        current_alert      = get_condition_alert(current_risk_score, current_regime_id)
+        current_profile    = REGIME_PROFILES[current_regime_id]
+        latest_row         = df.iloc[-1]
+
+        indicators = {
+            'rsi':       safe_scalar(latest_row['RSI14']),
+            'ema20':     safe_scalar(latest_row['EMA20']),
+            'macd':      safe_scalar(latest_row['MACD']),
+            'macd_hist': safe_scalar(latest_row['MACD_hist']),
+            'close':     safe_scalar(latest_row['Close']),
+            'logret':    safe_scalar(latest_row['LogReturn']),
+        }
+
+        timeline_dates = labels.index
+        sample_step = max(1, len(timeline_dates) // 500)
+        sampled_idx = list(range(0, len(timeline_dates), sample_step))
+        if sampled_idx[-1] != len(timeline_dates) - 1:
+            sampled_idx.append(len(timeline_dates) - 1)
+
+        price_close = df_aligned['Close']
+        timeline = []
+        for i in sampled_idx:
+            d   = timeline_dates[i]
+            rid = int(labels.iloc[i])
+            rs  = safe_scalar(risk_scores.iloc[i])
+            close_val = safe_scalar(price_close.get(d, None))
+            timeline.append({
+                'date':         d.strftime('%Y-%m-%d'),
+                'regime_id':    rid,
+                'regime_name':  REGIME_PROFILES[rid]['name'],
+                'regime_color': REGIME_PROFILES[rid]['color'],
+                'risk_score':   rs,
+                'close':        close_val,
+            })
+
+        def safe_stat(s):
+            return {k: (safe_scalar(v) if not isinstance(v, (list, dict)) else v)
+                    for k, v in s.items()}
+
+        stats_out = {}
+        for rid, s in regime_stats.items():
+            stats_out[str(rid)] = {
+                'id': s['id'], 'name': s['name'], 'color': s['color'],
+                'description': s['description'], 'total_days': s['total_days'],
+                'fwd_5d': safe_stat(s['fwd_5d']),
+                'fwd_10d': safe_stat(s['fwd_10d']),
+                'fwd_20d': safe_stat(s['fwd_20d']),
+            }
+
+        similar_matches = find_similar_historical_scenarios(df_aligned, feat, labels, top_k=5)
+        quant_backtest  = compute_quant_backtest(df_aligned, labels)
+
+        return jsonify({
+            'ticker':          ticker,
+            'current_regime':  {'id': current_regime_id, 'name': current_profile['name'],
+                                'color': current_profile['color'], 'description': current_profile['description']},
+            'risk_score':      round(current_risk_score, 2),
+            'alert':           current_alert,
+            'indicators':      indicators,
+            'regime_stats':    stats_out,
+            'timeline':        timeline,
+            'similar_matches': similar_matches,
+            'quant_backtest':  quant_backtest,
+        })
+
+    @flask_app.route('/api/predict', methods=['POST'])
+    def api_predict():
+        payload      = request.get_json(force=True) or {}
+        ticker       = payload.get('ticker', CONFIG['ticker']).upper()
+        start        = payload.get('start_date', CONFIG['start_date'])
+        end          = payload.get('end_date', CONFIG['end_date'])
+        seq_len      = int(payload.get('sequence_length', CONFIG['sequence_length']))
+        epochs       = int(payload.get('epochs', CONFIG['epochs']))
+        batch_size   = int(payload.get('batch_size', CONFIG['batch_size']))
+        future_days  = int(payload.get('future_days', 5))
+        force_retrain = bool(payload.get('force_retrain', False))
+
+        cache_key     = f"{ticker}_{start}_{end}_{seq_len}_{epochs}"
+        selected      = payload.get('model')
+        selected_list = [selected] if selected in {'LSTM', 'GRU', 'Transformer'} else None
+        use_es        = bool(payload.get('early_stopping', True))
+
+        data   = prepare_data(ticker, start, end, seq_len)
+        splits = split_and_scale_data(
+            data['X_raw'], data['y_raw'], data['dates_raw'], data['base_prices_raw'],
+            CONFIG['train_split'], CONFIG['val_split'], seq_len
+        )
+        scaler_y    = splits['scaler_y']
+        scaler_X    = splits['scaler_X']
+        input_shape = (seq_len, data['X_raw'].shape[1])
+
+        if cache_key in MODEL_CACHE and not force_retrain:
+            models_dict = MODEL_CACHE[cache_key]['models']
+            from_cache  = True
+        else:
+            models_dict = train_models(splits, input_shape, epochs, batch_size,
+                                       selected_models=selected_list, use_early_stopping=use_es)
+            MODEL_CACHE[cache_key] = {
+                'models':     models_dict,
+                'scaler_X':   scaler_X,
+                'scaler_y':   scaler_y,
+                'trained_at': datetime.datetime.utcnow().isoformat(),
+                'cache_key':  cache_key,
+            }
+            from_cache = False
+
+        eval_results = evaluate_and_ensemble(models_dict, splits, scaler_y)
+        backtest = run_backtest(
+            eval_results['predictions']['Ensemble'],
+            eval_results['y_test_actual'],
+            eval_results['dates_test'],
+            float(payload.get('initial_capital', CONFIG['initial_capital']))
+        )
+
+        def roll_forecast(mdls, last_seq, steps, sy, sx, close_idx, last_price):
+            import numpy as _np
+            seq   = last_seq.copy().astype(_np.float32)
+            price = float(last_price)
+            preds = []
+            for _ in range(steps):
+                lrs = []
+                for name, mdl in mdls.items():
+                    if name.endswith('_history'): continue
+                    yhat_s = mdl.predict(seq[_np.newaxis, ...], verbose=0).ravel()[0]
+                    logret = sy.inverse_transform([[yhat_s]])[0, 0]
+                    lrs.append(logret)
+                next_price = price * float(_np.exp(float(_np.mean(lrs))))
+                preds.append(next_price)
+                price = next_price
+                seq = _np.roll(seq, -1, axis=0)
+                seq[-1, close_idx] = scale_single_feature(next_price, sx, close_idx)
+            return preds
+
+        X_te_seq   = splits['test'][0]
+        last_seq   = X_te_seq[-1] if len(X_te_seq) > 0 else splits['train'][0][-1]
+        last_price = float(eval_results['y_test_actual'][-1])
+        future_forecast = roll_forecast(models_dict, last_seq, future_days,
+                                        scaler_y, scaler_X, data['close_feature_index'], last_price)
+        last_date    = eval_results['dates_test'][-1]
+        future_dates = [(last_date + pd.Timedelta(days=i+1)).strftime('%Y-%m-%d')
+                        for i in range(future_days)]
+
+        def safe_scalar(v):
+            if v is None: return None
+            if isinstance(v, (float,)) and (math.isnan(v) or math.isinf(v)): return None
+            return v
+        def safe_list(a): return [safe_scalar(v) for v in a]
+
+        response = {
+            'ticker': ticker, 'from_cache': from_cache, 'cache_key': cache_key,
+            'dates':  [d.strftime('%Y-%m-%d') for d in eval_results['dates_test']],
+            'actual': safe_list(eval_results['y_test_actual']),
+            'predictions': {k: safe_list(v) for k, v in eval_results['predictions'].items()},
+            'confidence': {
+                'lower': safe_list(eval_results['confidence_intervals'][0]),
+                'upper': safe_list(eval_results['confidence_intervals'][1]),
+            },
+            'metrics': {k: {mk: safe_scalar(mv) for mk, mv in md.items()}
+                        for k, md in eval_results['metrics'].items()},
+            'backtest': {
+                'equity':       safe_list(backtest['equity']),
+                'buy_signals':  safe_list(backtest['buy_signals']),
+                'sell_signals': safe_list(backtest['sell_signals']),
+                'metrics':      {mk: safe_scalar(mv) for mk, mv in backtest['metrics'].items()},
+            },
+            'future': {'dates': future_dates, 'predictions': safe_list(future_forecast)},
+        }
+        histories = {
+            k.replace('_history', ''): {hk: safe_list(hv) for hk, hv in h.items()}
+            for k, h in models_dict.items() if k.endswith('_history')
+        }
+        response['histories'] = histories
+        return jsonify(response)
+
+    @flask_app.route('/api/wf_validate', methods=['POST'])
+    def api_wf_validate():
+        payload    = request.get_json(force=True) or {}
+        ticker     = payload.get('ticker', 'AAPL').upper()
+        start      = payload.get('start_date', CONFIG['start_date'])
+        end        = payload.get('end_date', CONFIG['end_date'])
+        n_folds    = int(payload.get('n_folds', 5))
+        model_type = payload.get('model', 'GRU')
+        epochs     = int(payload.get('epochs', 10))
+        batch_size = int(payload.get('batch_size', 32))
+        try:
+            result = walk_forward_validate(ticker, start, end,
+                n_folds=n_folds, model_type=model_type,
+                epochs=epochs, batch_size=batch_size)
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    # ═══════════════════════════════════════
+    # v2 routes (Phase 2)
+    # ═══════════════════════════════════════
+
+    @flask_app.route('/api/v2/train', methods=['POST'])
+    def v2_train():
+        """
+        POST /api/v2/train
+        Enqueue an async training job. Returns job_id immediately.
+        Poll GET /api/v2/jobs/{job_id} for status.
+
+        Body: { ticker, start_date, end_date, epochs, seq_len, batch_size, models }
+        """
+        payload  = request.get_json(force=True) or {}
+        ticker   = payload.get('ticker', 'AAPL').upper()
+        start    = payload.get('start_date', CFG.default_start_date)
+        end      = payload.get('end_date', datetime.date.today().isoformat())
+        epochs   = int(payload.get('epochs', CFG.epochs))
+        seq_len  = int(payload.get('seq_len', CFG.sequence_length))
+        batch_sz = int(payload.get('batch_size', CFG.batch_size))
+        mdl_list = payload.get('models', ['LSTM', 'GRU', 'Transformer'])
+
+        try:
+            job_id = trainer.submit(
+                ticker=ticker, start_date=start, end_date=end,
+                seq_len=seq_len, epochs=epochs, batch_size=batch_sz,
+                models=mdl_list,
+            )
+            job = trainer.get_job(job_id)
+            return jsonify({
+                'job_id':  job_id,
+                'version': job.version if job else None,
+                'ticker':  ticker,
+                'status':  'queued',
+                'message': f'Training job enqueued. Poll GET /api/v2/jobs/{job_id} for status.',
+            }), 202
+        except Exception as e:
+            log.error(f'v2/train error: {e}')
+            return jsonify({'error': str(e)}), 500
+
+    @flask_app.route('/api/v2/jobs/<job_id>', methods=['GET'])
+    def v2_job_status(job_id):
+        """GET /api/v2/jobs/{job_id} — Poll training job status."""
+        job = trainer.get_job(job_id)
+        if job is None:
+            return jsonify({'error': f'Job {job_id} not found'}), 404
+        return jsonify(job.to_dict())
+
+    @flask_app.route('/api/v2/jobs', methods=['GET'])
+    def v2_list_jobs():
+        """GET /api/v2/jobs — List all training jobs."""
+        return jsonify({
+            'jobs':         trainer.list_jobs(),
+            'active_count': trainer.active_count(),
+        })
+
+    @flask_app.route('/api/v2/registry', methods=['GET'])
+    def v2_registry():
+        """GET /api/v2/registry — Full model registry."""
+        return jsonify(registry.full_registry())
+
+    @flask_app.route('/api/v2/registry/<ticker>', methods=['GET'])
+    def v2_registry_ticker(ticker):
+        """GET /api/v2/registry/{ticker} — All versions for a ticker."""
+        ticker = ticker.upper()
+        versions = registry.list_versions(ticker)
+        best     = registry.get_best(ticker)
+        latest   = registry.get_latest(ticker)
+        if not versions:
+            return jsonify({'error': f'No models found for {ticker}'}), 404
+        return jsonify({
+            'ticker':   ticker,
+            'versions': versions,
+            'best':     best,
+            'latest':   latest,
+        })
+
+    @flask_app.route('/api/v2/predict', methods=['POST'])
+    def v2_predict():
+        """
+        POST /api/v2/predict
+        Inference using a saved model. Never retrains.
+        Requires a prior successful training job for the ticker.
+
+        Body: { ticker, start_date, end_date, version (optional: best|latest|v3) }
+        """
+        payload  = request.get_json(force=True) or {}
+        ticker   = payload.get('ticker', 'AAPL').upper()
+        start    = payload.get('start_date', CFG.default_start_date)
+        end      = payload.get('end_date', datetime.date.today().isoformat())
+        version  = payload.get('version', 'best')
+        force    = bool(payload.get('force_refresh', False))
+
+        result = engine.predict(ticker, start, end, version=version, force_refresh=force)
+        if 'error' in result:
+            return jsonify(result), 404
+        return jsonify(result)
+
+    @flask_app.route('/api/v2/cache', methods=['DELETE'])
+    def v2_flush_cache():
+        """DELETE /api/v2/cache — Flush the inference cache (both layers)."""
+        cache.flush()
+        engine.evict_artifacts()
+        return jsonify({'status': 'flushed', 'message': 'Inference cache cleared.'})
+
+    @flask_app.route('/api/v2/metrics', methods=['GET'])
+    def v2_metrics():
+        """GET /api/v2/metrics — System health and performance counters."""
+        return jsonify({
+            'phase':          'Phase-2-Production-Pipeline',
+            'timestamp':       datetime.datetime.utcnow().isoformat(),
+            'registry':        registry.stats(),
+            'training': {
+                'active_jobs':  trainer.active_count(),
+                'total_jobs':   len(trainer.list_jobs()),
+                'workers':      CFG.max_worker_threads,
+            },
+            'inference_cache': cache.stats(),
+            'artifact_store':  {
+                'disk_bytes':   store.disk_usage_bytes(),
+                'disk_mb':      round(store.disk_usage_bytes() / 1024**2, 2),
+                'base_dir':     CFG.model_artifacts_dir,
+            },
+            'scheduler':       scheduler.status(),
+            'config': {
+                'stale_after_days':       CFG.model_stale_days,
+                'scheduler_interval_s':   CFG.scheduler_interval_s,
+                'inference_cache_ttl_s':  CFG.inference_cache_ttl_s,
+                'risk_free_rate_annual':  CFG.risk_free_rate_annual,
+                'transaction_cost_pct':   CFG.transaction_cost_pct,
+            },
+        })
+
+    log.info("All API routes registered. Starting Flask server...")
+    flask_app.run(host=CFG.host, port=CFG.port, debug=CFG.debug)
