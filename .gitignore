@@ -69,6 +69,14 @@ model_artifacts/
 # Pickle files (inference cache, scikit-learn scalers outside model_artifacts/)
 *.pkl
 
+# ─── Old docs (removed — not part of Phase 1/2 project) ─────────────────────
+ARCHITECTURE.md
+PREDICTION_GUIDE.md
+QUICKSTART.md
+TECHNOLOGIES.md
+WEBSITE_PROMPT.md
+WHATS_NEW.md
+
 # ─── Generated one-off scripts (not part of the app) ─────────────────────────
 append_upgrade_guide.py
 generate_review_docx.py
