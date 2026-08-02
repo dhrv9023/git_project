@@ -1,11 +1,11 @@
-# Python bytecode & cache
+# ─── Python bytecode & cache ─────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 
-# Virtual environments
+# ─── Virtual environments ─────────────────────────────────────────────────────
 venv/
 .venv/
 env/
@@ -13,7 +13,7 @@ ENV/
 env.bak/
 venv.bak/
 
-# Distributions & Builds
+# ─── Distributions & Builds ──────────────────────────────────────────────────
 build/
 develop-eggs/
 dist/
@@ -33,12 +33,12 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Environment variables & local secrets
+# ─── Environment variables & secrets ─────────────────────────────────────────
 .env
 .env.local
 .env.*.local
 
-# IDE & Editor settings
+# ─── IDE & Editor settings ───────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
@@ -47,15 +47,30 @@ MANIFEST
 .DS_Store
 *.sublime-workspace
 
-# Testing & Coverage
+# ─── Testing & Coverage ──────────────────────────────────────────────────────
 .pytest_cache/
 .coverage
 htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# Data caches & Logs
+# ─── Data caches & Logs ──────────────────────────────────────────────────────
 *.log
 *.tmp
 *.sqlite3
 .ipynb_checkpoints/
+
+# ─── Phase 2: ML Runtime Artifacts ───────────────────────────────────────────
+# Model weights, scalers, and registry are generated at runtime by ModelStore
+# and ModelRegistry. They should NOT be committed — models can be multi-GB
+# and must be retrained per environment.
+model_artifacts/
+
+# Pickle files (inference cache, scikit-learn scalers outside model_artifacts/)
+*.pkl
+
+# ─── Generated documents & one-off scripts ───────────────────────────────────
+*.docx
+*.pdf
+append_upgrade_guide.py
+generate_review_docx.py
