@@ -69,8 +69,6 @@ model_artifacts/
 # Pickle files (inference cache, scikit-learn scalers outside model_artifacts/)
 *.pkl
 
-# ─── Generated documents & one-off scripts ───────────────────────────────────
-*.docx
-*.pdf
+# ─── Generated one-off scripts (not part of the app) ─────────────────────────
 append_upgrade_guide.py
 generate_review_docx.py
