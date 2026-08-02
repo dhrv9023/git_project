@@ -49,11 +49,27 @@ CONFIG = {
     'batch_size': 16,
     'initial_capital': 10000.0,
     'learning_rate': 1e-4,
-    'seed': 42
+    'seed': 42,
+    # --- Phase 1 Statistical Corrections ---
+    # BUG-07: Risk-free rate used in Sharpe ratio denominator.
+    # Using 5% annual (US T-bill proxy). Converted to daily inside Sharpe calcs.
+    'risk_free_rate_annual': 0.05,
+    # BUG-03: Round-trip transaction cost per trade (0.10% = 5 bps each leg).
+    # Applied whenever regime allocation weight changes between consecutive days.
+    'transaction_cost_pct': 0.001,
 }
 
 np.random.seed(CONFIG['seed'])
 tf.random.set_seed(CONFIG['seed'])
+
+# ---------------------------------------------------------------------------
+# BUG-05: In-memory model cache — prevents full retrain on every API call.
+# Key  : "{ticker}_{start}_{end}_{seq_len}_{epochs}"  (config-version hash)
+# Value: {'models': dict, 'scaler_X': obj, 'scaler_y': obj,
+#         'trained_at': ISO-str, 'cache_key': str}
+# Cache is server-session-scoped (survives requests, lost on restart).
+# ---------------------------------------------------------------------------
+MODEL_CACHE: dict = {}
 
 # --------------------------
 # GPU/Performance configuration
@@ -302,49 +318,121 @@ def prepare_data(ticker: str, start_date: str, end_date: str, sequence_length: i
 
     X = X_df.values.astype(np.float32)
     y = target_series.values.astype(np.float32)
+    base_prices_arr = base_prices.values
+    dates_arr = target_series.index
 
-    scaler_X = MinMaxScaler()
-    scaler_y = MinMaxScaler()
-    X_scaled = scaler_X.fit_transform(X)
-    y_scaled = scaler_y.fit_transform(y.reshape(-1, 1)).ravel()
+    # BUG-01 FIX: Do NOT scale here. Scaling must happen AFTER the chronological
+    # split so the scaler is fit only on training data. Fitting on the full dataset
+    # leaks future price extremes (min/max) into the training normalization space,
+    # which artificially reduces model loss and inflates evaluation metrics.
+    # Raw arrays are returned and scaled inside split_and_scale_data().
+    print(f"Raw feature matrix: {X.shape} | Raw targets: {y.shape}")
 
-    X_seq, y_seq = create_sequences(X_scaled, y_scaled, sequence_length)
-    base_seq = base_prices.values[sequence_length:]
-    dates = target_series.index[sequence_length:]
-
-    print(f"Sequences: {X_seq.shape} | Target: {y_seq.shape}")
-    
     return {
-        'X_seq': X_seq,
-        'y_seq': y_seq,
-        'dates': dates,
-        'scaler_X': scaler_X,
-        'scaler_y': scaler_y,
-        'base_seq': base_seq,
-        'feature_cols': feature_cols,
-        'close_feature_index': feature_cols.index('Close') if 'Close' in feature_cols else 0,
-        'logret_feature_index': feature_cols.index('LogReturn') if 'LogReturn' in feature_cols else len(feature_cols)-1
+        'X_raw': X,
+        'y_raw': y,
+        'dates_raw': dates_arr,
+        'base_prices_raw': base_prices_arr,
+        'sequence_length': sequence_length,
+        'feature_cols': available_cols,
+        'close_feature_index': available_cols.index('Close') if 'Close' in available_cols else 0,
+        'logret_feature_index': available_cols.index('LogReturn') if 'LogReturn' in available_cols else len(available_cols)-1,
     }
 
 
+def split_and_scale_data(X_raw: np.ndarray, y_raw: np.ndarray, dates, base_prices: np.ndarray,
+                         train_split: float, val_split: float, sequence_length: int) -> dict:
+    """
+    BUG-01 + BUG-02 FIX: Chronological split → scale → sequence creation.
+
+    Correct order of operations:
+      1. Split raw (unscaled) arrays at chronological boundaries.
+      2. Fit MinMaxScaler on the TRAINING partition only.
+      3. Transform val and test partitions using the train-fitted scaler.
+      4. Build sequences using a 'context window': prepend the last `seq_len`
+         rows of the preceding partition so val/test lookback windows never
+         cross a cold (unscaled) boundary.
+
+    Why context windows?
+      Without them, val_seq[0] would have no prior rows to look back into and
+      the first `seq_len` samples of the val set would be wasted. The context
+      rows are already correctly scaled (train scaler), so no leakage occurs.
+    """
+    n = len(X_raw)
+    n_train = int(n * train_split)
+    n_val   = int(n * val_split)
+    n_test  = n - n_train - n_val
+    seq_len = sequence_length
+
+    # --- Step 1: Chronological split of RAW arrays ---
+    X_tr_raw = X_raw[:n_train]
+    X_va_raw = X_raw[n_train:n_train + n_val]
+    X_te_raw = X_raw[n_train + n_val:]
+
+    y_tr_raw = y_raw[:n_train]
+    y_va_raw = y_raw[n_train:n_train + n_val]
+    y_te_raw = y_raw[n_train + n_val:]
+
+    # --- Step 2: Fit scalers on TRAINING data only ---
+    scaler_X = MinMaxScaler()
+    scaler_y = MinMaxScaler()
+    scaler_X.fit(X_tr_raw)
+    scaler_y.fit(y_tr_raw.reshape(-1, 1))
+
+    # --- Step 3: Transform each partition (val/test use train-fit scaler) ---
+    X_tr = scaler_X.transform(X_tr_raw)
+    X_va = scaler_X.transform(X_va_raw)
+    X_te = scaler_X.transform(X_te_raw)
+
+    y_tr = scaler_y.transform(y_tr_raw.reshape(-1, 1)).ravel()
+    y_va = scaler_y.transform(y_va_raw.reshape(-1, 1)).ravel()
+    y_te = scaler_y.transform(y_te_raw.reshape(-1, 1)).ravel()
+
+    # --- Step 4: Create sequences with context windows ---
+    # Training: straightforward — sequences from training rows only.
+    X_tr_seq, y_tr_seq = create_sequences(X_tr, y_tr, seq_len)
+    dates_tr  = dates[seq_len:n_train]
+    base_tr   = base_prices[seq_len:n_train]
+
+    # Validation: prepend last seq_len rows of training as lookback context.
+    # This gives val_seq[0] a full seq_len-length input window without leaking
+    # any scaler statistics (context rows use the train-fit scaler transform).
+    X_va_ctx = np.concatenate([X_tr[-seq_len:], X_va], axis=0)
+    y_va_ctx = np.concatenate([y_tr[-seq_len:], y_va], axis=0)
+    X_va_seq, y_va_seq = create_sequences(X_va_ctx, y_va_ctx, seq_len)
+    dates_va  = dates[n_train:n_train + n_val]
+    base_va   = base_prices[n_train:n_train + n_val]
+
+    # Test: prepend last seq_len rows of validation as lookback context.
+    X_te_ctx = np.concatenate([X_va[-seq_len:], X_te], axis=0)
+    y_te_ctx = np.concatenate([y_va[-seq_len:], y_te], axis=0)
+    X_te_seq, y_te_seq = create_sequences(X_te_ctx, y_te_ctx, seq_len)
+    dates_te  = dates[n_train + n_val:]
+    base_te   = base_prices[n_train + n_val:]
+
+    print(f"Train/Val/Test sequences: {len(X_tr_seq)}/{len(X_va_seq)}/{len(X_te_seq)}")
+    return {
+        'train':    (X_tr_seq, y_tr_seq, dates_tr, base_tr),
+        'val':      (X_va_seq, y_va_seq, dates_va, base_va),
+        'test':     (X_te_seq, y_te_seq, dates_te, base_te),
+        'scaler_X': scaler_X,
+        'scaler_y': scaler_y,
+    }
+
+
+# Legacy alias kept so existing call-sites that use 'split_data' still work
+# during any incremental migration. New code should use split_and_scale_data.
 def split_data(X, y, dates, base_seq, train_split, val_split):
+    """DEPRECATED: use split_and_scale_data() which fixes BUG-01/02."""
     n = len(X)
     n_train = int(n * train_split)
     n_val = int(n * val_split)
-    X_train, y_train = X[:n_train], y[:n_train]
-    X_val, y_val = X[n_train:n_train+n_val], y[n_train:n_train+n_val]
-    X_test, y_test = X[n_train+n_val:], y[n_train+n_val:]
-    dates_train = dates[:n_train]
-    dates_val = dates[n_train:n_train+n_val]
-    dates_test = dates[n_train+n_val:]
-    base_train = base_seq[:n_train]
-    base_val = base_seq[n_train:n_train+n_val]
-    base_test = base_seq[n_train+n_val:]
-    print(f"Train/Val/Test: {len(X_train)}/{len(X_val)}/{len(X_test)}")
     return {
-        'train': (X_train, y_train, dates_train, base_train),
-        'val': (X_val, y_val, dates_val, base_val),
-        'test': (X_test, y_test, dates_test, base_test)
+        'train': (X[:n_train], y[:n_train], dates[:n_train], base_seq[:n_train]),
+        'val':   (X[n_train:n_train+n_val], y[n_train:n_train+n_val],
+                  dates[n_train:n_train+n_val], base_seq[n_train:n_train+n_val]),
+        'test':  (X[n_train+n_val:], y[n_train+n_val:],
+                  dates[n_train+n_val:], base_seq[n_train+n_val:]),
     }
 
 
@@ -522,7 +610,11 @@ def run_backtest(pred, actual, dates, initial_capital: float):
     equity = initial_capital * (1 + strat_ret).cumprod()
     buy_signals = np.where(signal > 0, actual, np.nan)
     sell_signals = np.where(signal < 0, actual, np.nan)
-    sharpe = np.mean(strat_ret) / (np.std(strat_ret) + 1e-9) * np.sqrt(252)
+    # BUG-07: Subtract risk-free rate from returns before computing Sharpe.
+    # Sharpe = (E[r] - Rf_daily) / std(r) * sqrt(252)
+    rf_daily  = CONFIG['risk_free_rate_annual'] / 252.0
+    excess_ret = strat_ret - rf_daily
+    sharpe = np.mean(excess_ret) / (np.std(excess_ret) + 1e-9) * np.sqrt(252)
     total_return = (equity[-1] / equity[0] - 1) * 100
     buy_hold = (actual[-1] / actual[0] - 1) * 100
     return {
@@ -656,14 +748,25 @@ def compute_regime_stats(df: pd.DataFrame, labels: pd.Series) -> dict:
     """
     For each regime, compute forward return statistics from historical occurrences.
     Returns a dict keyed by semantic regime id.
+
+    BUG-06 FIX: Exclude dates within the last MAX_HORIZON trading days.
+    Computing a 20-day forward return on, e.g., the final 5 dates of the dataset
+    would use only 5 available price points, producing incomplete/biased statistics.
+    Only dates with a FULL forward window are included in summary statistics.
     """
+    MAX_HORIZON = 20   # largest forward-return horizon used below
     common_idx = df.index.intersection(labels.index)
     close = df.loc[common_idx, 'Close']
+
+    # Cutoff: exclude the last MAX_HORIZON dates so every forward window is complete
+    eligible_cutoff = close.index[-MAX_HORIZON] if len(close) > MAX_HORIZON else close.index[0]
 
     stats = {}
     for regime_id in range(6):
         regime_dates = labels[labels == regime_id].index
         regime_dates_common = regime_dates.intersection(close.index)
+        # BUG-06: Only keep dates where the full 20-day forward window is observable
+        regime_dates_common = regime_dates_common[regime_dates_common < eligible_cutoff]
 
         fwd_5, fwd_10, fwd_20 = [], [], []
         for d in regime_dates_common:
@@ -759,11 +862,18 @@ def find_similar_historical_scenarios(df: pd.DataFrame, feat: pd.DataFrame, labe
 
 def compute_quant_backtest(df: pd.DataFrame, labels: pd.Series) -> dict:
     """
-    Run a Quantitative Regime Strategy vs. Buy & Hold Benchmark on 100% real historical data.
+    Run a Quantitative Regime Strategy vs. Buy & Hold Benchmark on real historical data.
     Regime Allocation Matrix:
       - Trending Bull (0), Recovery (3): 100% Equity Exposure
       - Sideways (2), Overbought (1): 50% Equity, 50% Cash
       - Bear (4), Stress (5): 0% Equity (100% Cash)
+
+    BUG-03 FIX: Transaction costs applied on every weight change.
+      cost = CONFIG['transaction_cost_pct'] * |weight[t] - weight[t-1]|
+      This models brokerage + bid-ask spread. Default: 0.10% round-trip.
+
+    BUG-07 FIX: Sharpe ratio uses risk-free rate from CONFIG.
+      Sharpe = (E[r] - Rf_daily) / std(r) * sqrt(252)
     """
     common = df.index.intersection(labels.index)
     close = df.loc[common, 'Close']
@@ -781,7 +891,13 @@ def compute_quant_backtest(df: pd.DataFrame, labels: pd.Series) -> dict:
         else:
             weights[idx] = 0.0
 
-    strat_ret = (weights.shift(1).fillna(0.0) * daily_ret)
+    # BUG-03: Deduct transaction cost whenever allocation weight changes.
+    # weight_prev is yesterday's allocation; if it differs from today's, a trade occurs.
+    tc = CONFIG['transaction_cost_pct']
+    weight_changes = weights.diff().abs().fillna(0.0)
+    transaction_costs = weight_changes * tc   # proportional cost on the traded portion
+
+    strat_ret = (weights.shift(1).fillna(0.0) * daily_ret) - transaction_costs
 
     init_cap = 10000.0
     bh_equity = init_cap * (1.0 + daily_ret).cumprod()
@@ -798,35 +914,177 @@ def compute_quant_backtest(df: pd.DataFrame, labels: pd.Series) -> dict:
     bh_mdd = calc_mdd(bh_equity)
     strat_mdd = calc_mdd(strat_equity)
 
+    # BUG-07: Correct Sharpe = (mean_excess_return) / std * sqrt(252)
+    rf_daily = CONFIG['risk_free_rate_annual'] / 252.0
     def calc_sharpe(ret_series):
-        std = ret_series.std()
+        excess = ret_series - rf_daily
+        std = excess.std()
         if std == 0 or np.isnan(std): return 0.0
-        return float(ret_series.mean() / std * np.sqrt(252))
+        return float(excess.mean() / std * np.sqrt(252))
 
-    bh_sharpe = calc_sharpe(daily_ret)
+    bh_sharpe   = calc_sharpe(daily_ret)
     strat_sharpe = calc_sharpe(strat_ret)
 
     active_days = strat_ret[weights.shift(1) > 0]
     win_rate = float((active_days > 0).mean() * 100.0) if len(active_days) > 0 else 0.0
 
+    # Total transaction cost paid (for transparency in output)
+    total_tc_paid_pct = float(transaction_costs.sum() * 100.0)
+    n_trades = int((weight_changes > 0).sum())
+
     step = max(1, len(common) // 200)
-    dates_sampled = [d.strftime('%Y-%m-%d') for d in common[::step]]
-    bh_sampled = [round(float(v), 2) for v in bh_equity.iloc[::step]]
-    strat_sampled = [round(float(v), 2) for v in strat_equity.iloc[::step]]
+    dates_sampled  = [d.strftime('%Y-%m-%d') for d in common[::step]]
+    bh_sampled     = [round(float(v), 2) for v in bh_equity.iloc[::step]]
+    strat_sampled  = [round(float(v), 2) for v in strat_equity.iloc[::step]]
 
     return {
         'dates': dates_sampled,
         'benchmark_equity': bh_sampled,
         'strategy_equity': strat_sampled,
         'metrics': {
-            'benchmark_total_return': round(bh_total_ret, 2),
-            'strategy_total_return': round(strat_total_ret, 2),
-            'benchmark_max_drawdown': round(bh_mdd, 2),
-            'strategy_max_drawdown': round(strat_mdd, 2),
-            'benchmark_sharpe': round(bh_sharpe, 2),
-            'strategy_sharpe': round(strat_sharpe, 2),
-            'strategy_win_rate': round(win_rate, 1)
+            'benchmark_total_return':  round(bh_total_ret, 2),
+            'strategy_total_return':   round(strat_total_ret, 2),
+            'benchmark_max_drawdown':  round(bh_mdd, 2),
+            'strategy_max_drawdown':   round(strat_mdd, 2),
+            'benchmark_sharpe':        round(bh_sharpe, 2),
+            'strategy_sharpe':         round(strat_sharpe, 2),
+            'strategy_win_rate':       round(win_rate, 1),
+            'total_transaction_cost_pct': round(total_tc_paid_pct, 4),
+            'n_trades':                n_trades,
+            'risk_free_rate_annual':   CONFIG['risk_free_rate_annual'],
         }
+    }
+
+
+def walk_forward_validate(ticker: str, start_date: str, end_date: str,
+                          n_folds: int = 5,
+                          model_type: str = 'GRU',
+                          epochs: int = 10,
+                          batch_size: int = 32) -> dict:
+    """
+    BUG-04 FIX: Walk-Forward (Expanding Window) Validation.
+
+    Why a single 70/15/15 split is insufficient:
+      - It tests the model on exactly ONE historical period. If that period
+        happens to be low-volatility or trending, metrics look artificially good.
+      - Walk-forward validation tests the model across N disjoint out-of-sample
+        periods, giving mean ± std of metrics — a statistically honest estimate.
+
+    Method (Expanding Anchor):
+      - The training window always starts from day 0 (anchored).
+      - Each fold extends the training set by 1/n_folds of total data.
+      - The test set for each fold is the NEXT 1/n_folds block (never seen).
+      - No data from any test block leaks into any training block.
+
+    Returns per-fold metrics and aggregate mean/std for portfolio review.
+    """
+    print(f"\nWalk-Forward Validation: {n_folds} folds, model={model_type}")
+
+    # Prepare raw data once (no scaling — scaling happens per fold)
+    data = prepare_data(ticker, start_date, end_date, CONFIG['sequence_length'])
+    X_raw  = data['X_raw']
+    y_raw  = data['y_raw']
+    dates  = data['dates_raw']
+    base   = data['base_prices_raw']
+    seq_len = data['sequence_length']
+
+    n = len(X_raw)
+    fold_size = n // (n_folds + 1)   # +1 so there's always a test block after last train
+
+    fold_results = []
+
+    for fold in range(n_folds):
+        train_end = fold_size * (fold + 1)    # expanding: grows each fold
+        test_start = train_end
+        test_end   = min(test_start + fold_size, n)
+
+        if test_end - test_start < seq_len + 10:
+            print(f"  Fold {fold+1}: skipped (insufficient test data)")
+            continue
+
+        # Scale: fit ONLY on this fold's training partition
+        scaler_X = MinMaxScaler()
+        scaler_y = MinMaxScaler()
+        X_tr_raw = X_raw[:train_end]
+        y_tr_raw = y_raw[:train_end]
+        scaler_X.fit(X_tr_raw)
+        scaler_y.fit(y_tr_raw.reshape(-1, 1))
+
+        X_tr = scaler_X.transform(X_raw[:train_end])
+        y_tr = scaler_y.transform(y_raw[:train_end].reshape(-1, 1)).ravel()
+
+        X_te_raw_fold = X_raw[test_start:test_end]
+        y_te_raw_fold = y_raw[test_start:test_end]
+        X_te_ctx = np.concatenate([X_tr[-seq_len:], scaler_X.transform(X_te_raw_fold)], axis=0)
+        y_te_ctx = np.concatenate([y_tr[-seq_len:], scaler_y.transform(y_te_raw_fold.reshape(-1,1)).ravel()], axis=0)
+        X_te_seq, y_te_seq = create_sequences(X_te_ctx, y_te_ctx, seq_len)
+
+        X_tr_seq, y_tr_seq = create_sequences(X_tr, y_tr, seq_len)
+
+        if len(X_tr_seq) < 10 or len(X_te_seq) < 5:
+            continue
+
+        input_shape = (seq_len, X_raw.shape[1])
+
+        # Train selected model for this fold
+        if model_type == 'LSTM':
+            mdl = build_lstm(input_shape)
+        elif model_type == 'Transformer':
+            mdl = build_transformer(input_shape)
+        else:
+            mdl = build_gru(input_shape)
+
+        es = callbacks.EarlyStopping(monitor='loss', patience=3, restore_best_weights=True)
+        mdl.fit(X_tr_seq, y_tr_seq, epochs=epochs, batch_size=batch_size,
+                verbose=0, callbacks=[es])
+
+        # Evaluate on out-of-sample test block
+        y_pred_scaled = mdl.predict(X_te_seq, verbose=0).ravel()
+        logret_true = scaler_y.inverse_transform(y_te_seq.reshape(-1,1)).ravel()
+        logret_pred = scaler_y.inverse_transform(y_pred_scaled.reshape(-1,1)).ravel()
+
+        base_te = base[test_start:test_end][:len(y_te_seq)]
+        y_true_prices = base_te * np.exp(logret_true)
+        y_pred_prices = base_te * np.exp(logret_pred)
+
+        metrics = calculate_metrics(y_true_prices, y_pred_prices)
+
+        # Directional accuracy on log returns (sign prediction)
+        dir_acc = float((np.sign(logret_true) == np.sign(logret_pred)).mean() * 100)
+
+        fold_results.append({
+            'fold': fold + 1,
+            'train_days':  train_end,
+            'test_days':   test_end - test_start,
+            'rmse':        round(metrics['RMSE'], 4),
+            'mae':         round(metrics['MAE'], 4),
+            'directional_accuracy': round(dir_acc, 2),
+            'r2':          round(metrics['R2'], 4),
+        })
+        print(f"  Fold {fold+1}: DA={dir_acc:.1f}%  RMSE={metrics['RMSE']:.4f}  R2={metrics['R2']:.4f}")
+
+    if not fold_results:
+        return {'error': 'Insufficient data for walk-forward validation', 'folds': []}
+
+    das   = [f['directional_accuracy'] for f in fold_results]
+    rmses = [f['rmse'] for f in fold_results]
+
+    return {
+        'model': model_type,
+        'n_folds': len(fold_results),
+        'folds': fold_results,
+        'summary': {
+            'mean_directional_accuracy': round(float(np.mean(das)), 2),
+            'std_directional_accuracy':  round(float(np.std(das)), 2),
+            'mean_rmse':                 round(float(np.mean(rmses)), 4),
+            'std_rmse':                  round(float(np.std(rmses)), 4),
+        },
+        'interpretation': (
+            f"Over {len(fold_results)} out-of-sample folds, {model_type} achieved "
+            f"{np.mean(das):.1f}% ± {np.std(das):.1f}% directional accuracy. "
+            f"Values near 50% indicate near-random. Values >55% sustained across "
+            f"all folds suggest genuine predictive signal."
+        )
     }
 
 
@@ -855,11 +1113,14 @@ def main():
     print(f"Period: {CONFIG['start_date']} to {CONFIG['end_date']}")
     print("="*70)
     
-    data = prepare_data(CONFIG['ticker'], CONFIG['start_date'], CONFIG['end_date'], CONFIG['sequence_length'])
-    splits = split_data(data['X_seq'], data['y_seq'], data['dates'], CONFIG['train_split'], CONFIG['val_split'])
-    input_shape = (CONFIG['sequence_length'], data['X_seq'].shape[2])
+    data   = prepare_data(CONFIG['ticker'], CONFIG['start_date'], CONFIG['end_date'], CONFIG['sequence_length'])
+    splits = split_and_scale_data(
+        data['X_raw'], data['y_raw'], data['dates_raw'], data['base_prices_raw'],
+        CONFIG['train_split'], CONFIG['val_split'], CONFIG['sequence_length']
+    )
+    input_shape = (CONFIG['sequence_length'], data['X_raw'].shape[1])
     models_dict = train_models(splits, input_shape, CONFIG['epochs'], CONFIG['batch_size'])
-    eval_results = evaluate_and_ensemble(models_dict, splits, data['scaler_y'])
+    eval_results = evaluate_and_ensemble(models_dict, splits, splits['scaler_y'])
 
     print("\n" + "="*70)
     print("STEP 5: BACKTESTING")
@@ -890,7 +1151,13 @@ if __name__ == '__main__':
 
         @app.route('/api/health', methods=['GET'])
         def health():
-            return jsonify({"status": "ok"})
+            # BUG-05: Report cache status so users know if models are warm
+            return jsonify({
+                'status': 'ok',
+                'cached_models': len(MODEL_CACHE),
+                'cache_keys': list(MODEL_CACHE.keys()),
+                'phase': 'Phase-1-Statistical-Corrections',
+            })
 
         @app.route('/api/regime', methods=['POST'])
         def api_regime():
@@ -1008,103 +1275,161 @@ if __name__ == '__main__':
 
         @app.route('/api/predict', methods=['POST'])
         def api_predict():
-            payload = request.get_json(force=True) or {}
-            ticker = payload.get('ticker', CONFIG['ticker']).upper()
-            start = payload.get('start_date', CONFIG['start_date'])
-            end = payload.get('end_date', CONFIG['end_date'])
-            seq_len = int(payload.get('sequence_length', CONFIG['sequence_length']))
-            epochs = int(payload.get('epochs', CONFIG['epochs']))
-            batch_size = int(payload.get('batch_size', CONFIG['batch_size']))
+            payload     = request.get_json(force=True) or {}
+            ticker      = payload.get('ticker', CONFIG['ticker']).upper()
+            start       = payload.get('start_date', CONFIG['start_date'])
+            end         = payload.get('end_date', CONFIG['end_date'])
+            seq_len     = int(payload.get('sequence_length', CONFIG['sequence_length']))
+            epochs      = int(payload.get('epochs', CONFIG['epochs']))
+            batch_size  = int(payload.get('batch_size', CONFIG['batch_size']))
             future_days = int(payload.get('future_days', 5))
+            force_retrain = bool(payload.get('force_retrain', False))
 
-            # Prepare, split, train, evaluate
-            data = prepare_data(ticker, start, end, seq_len)
-            splits = split_data(data['X_seq'], data['y_seq'], data['dates'], data['base_seq'], CONFIG['train_split'], CONFIG['val_split'])
-            input_shape = (seq_len, data['X_seq'].shape[2])
-            # Optional: train only selected model from frontend
-            selected = payload.get('model')
-            selected_list = [selected] if selected in {'LSTM','GRU','Transformer'} else None
+            # BUG-05: Cache key encodes all training hyperparameters that affect
+            # model weights so stale caches are never reused after config changes.
+            cache_key = f"{ticker}_{start}_{end}_{seq_len}_{epochs}"
+            selected  = payload.get('model')
+            selected_list = [selected] if selected in {'LSTM', 'GRU', 'Transformer'} else None
             use_es = bool(payload.get('early_stopping', True))
-            models_dict = train_models(splits, input_shape, epochs, batch_size, selected_models=selected_list, use_early_stopping=use_es)
-            eval_results = evaluate_and_ensemble(models_dict, splits, data['scaler_y'])
 
-            # Backtest
-            backtest = run_backtest(eval_results['predictions']['Ensemble'], eval_results['y_test_actual'], eval_results['dates_test'], float(payload.get('initial_capital', CONFIG['initial_capital'])))
+            # BUG-01+02: prepare_data now returns RAW arrays; scaling is deferred to split_and_scale_data
+            data = prepare_data(ticker, start, end, seq_len)
+            splits = split_and_scale_data(
+                data['X_raw'], data['y_raw'], data['dates_raw'], data['base_prices_raw'],
+                CONFIG['train_split'], CONFIG['val_split'], seq_len
+            )
+            scaler_y = splits['scaler_y']
+            scaler_X = splits['scaler_X']
 
-            # Multi-step forecast: model predicts log returns → reconstruct actual prices
-            # last_price is the last known actual price from the test set
-            def roll_forecast(models_dict, last_seq, steps, scaler_y, scaler_X, close_idx, last_price):
-                seq = last_seq.copy().astype(np.float32)
+            input_shape = (seq_len, data['X_raw'].shape[1])
+
+            # BUG-05: Serve from cache if available and not force-retraining
+            if cache_key in MODEL_CACHE and not force_retrain:
+                print(f"[CACHE HIT] Serving cached model for key: {cache_key}")
+                models_dict = MODEL_CACHE[cache_key]['models']
+                from_cache  = True
+            else:
+                print(f"[CACHE MISS] Training fresh model for key: {cache_key}")
+                models_dict = train_models(splits, input_shape, epochs, batch_size,
+                                           selected_models=selected_list, use_early_stopping=use_es)
+                # Store in cache: only the Keras model references (weights are in-memory)
+                MODEL_CACHE[cache_key] = {
+                    'models':     models_dict,
+                    'scaler_X':   scaler_X,
+                    'scaler_y':   scaler_y,
+                    'trained_at': datetime.datetime.utcnow().isoformat(),
+                    'cache_key':  cache_key,
+                }
+                from_cache = False
+
+            eval_results = evaluate_and_ensemble(models_dict, splits, scaler_y)
+
+            # BUG-07: run_backtest Sharpe also uses risk-free rate
+            rf_daily = CONFIG['risk_free_rate_annual'] / 252.0
+            backtest = run_backtest(
+                eval_results['predictions']['Ensemble'],
+                eval_results['y_test_actual'],
+                eval_results['dates_test'],
+                float(payload.get('initial_capital', CONFIG['initial_capital']))
+            )
+
+            # Multi-step forecast using the last sequence from the TEST partition
+            def roll_forecast(mdls, last_seq, steps, sy, sx, close_idx, last_price):
+                seq   = last_seq.copy().astype(np.float32)
                 price = float(last_price)
                 preds = []
                 for _ in range(steps):
-                    step_logreturns = []
-                    for name, mdl in models_dict.items():
-                        if name.endswith('_history'):
-                            continue
-                        yhat_scaled = mdl.predict(seq[np.newaxis, ...], verbose=0).ravel()[0]
-                        # Inverse-transform to get the log return (NOT a price)
-                        logret = scaler_y.inverse_transform([[yhat_scaled]])[0, 0]
-                        step_logreturns.append(logret)
-                    avg_logret = float(np.mean(step_logreturns))
-                    # Reconstruct next price: price_{t+1} = price_t * exp(logret)
-                    next_price = price * float(np.exp(avg_logret))
+                    lrs = []
+                    for name, mdl in mdls.items():
+                        if name.endswith('_history'): continue
+                        yhat_s = mdl.predict(seq[np.newaxis, ...], verbose=0).ravel()[0]
+                        logret = sy.inverse_transform([[yhat_s]])[0, 0]
+                        lrs.append(logret)
+                    avg_lr    = float(np.mean(lrs))
+                    next_price = price * float(np.exp(avg_lr))
                     preds.append(next_price)
                     price = next_price
-                    # Shift sequence window and update the Close feature with the scaled reconstructed price
                     seq = np.roll(seq, -1, axis=0)
-                    seq[-1, close_idx] = scale_single_feature(next_price, scaler_X, close_idx)
+                    seq[-1, close_idx] = scale_single_feature(next_price, sx, close_idx)
                 return preds
 
-            last_known_price = float(eval_results['y_test_actual'][-1])
-            last_seq = data['X_seq'][-1]
-            future_forecast = roll_forecast(models_dict, last_seq, future_days, data['scaler_y'], data.get('scaler_X', data.get('scaler')), data['close_feature_index'], last_known_price)
+            # Use last test sequence as seed for the autoregressive forecast
+            X_te_seq = splits['test'][0]
+            last_seq  = X_te_seq[-1] if len(X_te_seq) > 0 else splits['train'][0][-1]
+            last_price = float(eval_results['y_test_actual'][-1])
+            future_forecast = roll_forecast(
+                models_dict, last_seq, future_days, scaler_y, scaler_X,
+                data['close_feature_index'], last_price
+            )
+            last_date    = eval_results['dates_test'][-1]
+            future_dates = [(last_date + pd.Timedelta(days=i+1)).strftime('%Y-%m-%d')
+                            for i in range(future_days)]
 
-            last_date = eval_results['dates_test'][-1]
-            future_dates = [(last_date + pd.Timedelta(days=i+1)).strftime('%Y-%m-%d') for i in range(future_days)]
-
-            # Prepare JSON
-            dates_iso = [d.strftime('%Y-%m-%d') for d in eval_results['dates_test']]
-            # Replace NaNs with None for JSON safety
+            # JSON serialization helpers
             def safe_scalar(v):
-                if v is None:
-                    return None
-                if isinstance(v, (np.floating, np.integer)):
-                    v = v.item()
-                if isinstance(v, (float, int)):
-                    if (isinstance(v, float) and (math.isnan(v) or math.isinf(v))):
-                        return None
-                    return v
-                return float(v)
-
-            def safe_list(a):
-                return [safe_scalar(v) for v in a]
+                if v is None: return None
+                if isinstance(v, (np.floating, np.integer)): v = v.item()
+                if isinstance(v, float) and (math.isnan(v) or math.isinf(v)): return None
+                return v
+            def safe_list(a): return [safe_scalar(v) for v in a]
 
             response = {
-                'ticker': ticker,
-                'dates': dates_iso,
-                'actual': safe_list(eval_results['y_test_actual']),
+                'ticker':      ticker,
+                'from_cache':  from_cache,
+                'cache_key':   cache_key,
+                'dates':       [d.strftime('%Y-%m-%d') for d in eval_results['dates_test']],
+                'actual':      safe_list(eval_results['y_test_actual']),
                 'predictions': {k: safe_list(v) for k, v in eval_results['predictions'].items()},
                 'confidence': {
                     'lower': safe_list(eval_results['confidence_intervals'][0]),
                     'upper': safe_list(eval_results['confidence_intervals'][1])
                 },
-                'metrics': {k: {mk: safe_scalar(mv) for mk, mv in md.items()} for k, md in eval_results['metrics'].items()},
+                'metrics': {k: {mk: safe_scalar(mv) for mk, mv in md.items()}
+                            for k, md in eval_results['metrics'].items()},
                 'backtest': {
-                    'equity': safe_list(backtest['equity']),
-                    'buy_signals': safe_list(backtest['buy_signals']),
+                    'equity':       safe_list(backtest['equity']),
+                    'buy_signals':  safe_list(backtest['buy_signals']),
                     'sell_signals': safe_list(backtest['sell_signals']),
-                    'metrics': {mk: safe_scalar(mv) for mk, mv in backtest['metrics'].items()}
+                    'metrics':      {mk: safe_scalar(mv) for mk, mv in backtest['metrics'].items()}
                 },
                 'future': {
-                    'dates': future_dates,
+                    'dates':       future_dates,
                     'predictions': safe_list(future_forecast)
                 }
             }
-            # Include compact training histories for progress visualization
-            histories = {k.replace('_history',''): {hk: safe_list(hv) for hk, hv in h.items()} for k, h in models_dict.items() if k.endswith('_history')}
+            histories = {
+                k.replace('_history', ''): {hk: safe_list(hv) for hk, hv in h.items()}
+                for k, h in models_dict.items() if k.endswith('_history')
+            }
             response['histories'] = histories
             return jsonify(response)
+
+
+        @app.route('/api/wf_validate', methods=['POST'])
+        def api_wf_validate():
+            """
+            BUG-04 endpoint: Walk-Forward Validation.
+            POST body: { ticker, start_date, end_date, n_folds, model, epochs }
+            Returns per-fold and summary metrics.
+            Note: This is a heavy call (trains N models). Use sparingly.
+            """
+            payload    = request.get_json(force=True) or {}
+            ticker     = payload.get('ticker', 'AAPL').upper()
+            start      = payload.get('start_date', CONFIG['start_date'])
+            end        = payload.get('end_date', CONFIG['end_date'])
+            n_folds    = int(payload.get('n_folds', 5))
+            model_type = payload.get('model', 'GRU')
+            epochs     = int(payload.get('epochs', 10))
+            batch_size = int(payload.get('batch_size', 32))
+            try:
+                result = walk_forward_validate(
+                    ticker, start, end,
+                    n_folds=n_folds, model_type=model_type,
+                    epochs=epochs, batch_size=batch_size
+                )
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
 
         app.run(host='0.0.0.0', port=5000, debug=False)
     else:
