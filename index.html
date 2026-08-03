@@ -711,6 +711,78 @@
     .footer-bottom a:hover { text-decoration: underline; }
 
 
+    /* ── TOAST NOTIFICATION SYSTEM ── */
+    #toastContainer {
+      position: fixed; top: 80px; right: 24px; z-index: 9999;
+      display: flex; flex-direction: column; gap: 10px; max-width: 400px; width: 100%;
+      pointer-events: none;
+    }
+    .toast {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 18px; font-size: 0.88rem; color: var(--text);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3); backdrop-filter: blur(12px);
+      display: flex; align-items: flex-start; gap: 12px;
+      animation: toastIn 0.35s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: auto;
+    }
+    .toast.success { border-color: var(--green); }
+    .toast.error   { border-color: var(--red); }
+    .toast.info    { border-color: var(--cyan); }
+    .toast.warning { border-color: var(--amber); }
+    .toast-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .toast-body { flex: 1; line-height: 1.4; }
+    .toast-title { font-weight: 700; margin-bottom: 2px; font-size: 0.84rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .toast.success .toast-title { color: var(--green); }
+    .toast.error .toast-title   { color: var(--red); }
+    .toast.info .toast-title    { color: var(--cyan); }
+    .toast.warning .toast-title { color: var(--amber); }
+    .toast-msg { color: var(--muted); font-size: 0.82rem; }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(40px) scale(0.95); } to { opacity: 1; transform: translateX(0) scale(1); } }
+
+    /* ── KEYBOARD SHORTCUT BADGES ── */
+    .kbd-shortcut {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 4px;
+      padding: 2px 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+      color: var(--cyan); font-weight: 600; margin-left: 6px; display: inline-block;
+    }
+
+    /* ── SYSTEM TELEMETRY & CLUSTER HEALTH STUDIO ── */
+    .telemetry-section { background: var(--bg); }
+    .telemetry-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 2.2rem;
+    }
+    @media (max-width: 950px) { .telemetry-grid { grid-template-columns: 1fr; } }
+    
+    .telemetry-card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+      padding: 1.5rem; display: flex; flex-direction: column; gap: 1.2rem;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12); transition: border-color 0.3s;
+    }
+    .telemetry-card:hover { border-color: rgba(0,255,224,0.3); }
+    .telemetry-header {
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid var(--border); padding-bottom: 0.8rem;
+    }
+    .telemetry-title { font-size: 0.95rem; font-weight: 700; color: var(--cyan); display: flex; align-items: center; gap: 0.6rem; }
+    .telemetry-badge {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 600;
+      padding: 3px 8px; border-radius: 6px; background: var(--bg3); border: 1px solid var(--border); color: var(--green);
+    }
+
+    .telemetry-stat-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+    .telemetry-key { color: var(--muted); }
+    .telemetry-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--text); }
+    .telemetry-val.green { color: var(--green); }
+    .telemetry-val.red   { color: var(--red); }
+    .telemetry-val.cyan  { color: var(--cyan); }
+    .telemetry-val.amber { color: var(--amber); }
+
+    .telemetry-action-btn {
+      background: var(--bg3); border: 1px solid var(--border); color: var(--cyan);
+      padding: 6px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 600;
+      cursor: pointer; transition: all 0.2s; font-family: 'JetBrains Mono', monospace; width: 100%; text-align: center;
+    }
+    .telemetry-action-btn:hover { background: rgba(0,255,224,0.12); border-color: var(--cyan); }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 900px) {
       .regime-top-grid { grid-template-columns: 1fr; }
@@ -726,20 +798,25 @@
       .pipeline-row { gap: .3rem; }
       .pipe-arrow { display: none; }
     }
+
   </style>
 </head>
 <body>
+  <!-- TOAST NOTIFICATIONS CONTAINER -->
+  <div id="toastContainer"></div>
+
   <!-- NAV -->
   <nav>
     <div class="logo">Stock<span>Buddy</span></div>
     <ul class="nav-links">
       <li><a href="#features">Architecture</a></li>
-      <li><a href="#regime">Regime Engine</a></li>
+      <li><a href="#regime">Regime Engine <span class="kbd-shortcut">⌘K</span></a></li>
       <li><a href="#predict">Deep Learning</a></li>
+      <li><a href="#telemetry">System Health</a></li>
       <li><a href="#how-it-works">How It Works</a></li>
       <li><a href="#faq">FAQ</a></li>
       <li>
-        <button id="themeToggle" class="theme-toggle-btn">
+        <button id="themeToggle" class="theme-toggle-btn" aria-label="Toggle Dark and Light Mode">
           <span id="themeIcon">🌙</span> <span id="themeText">Dark</span>
         </button>
       </li>
@@ -1396,8 +1473,81 @@ Top Matches Identified:
 
 
 
+  <!-- DISTRIBUTED SYSTEM TELEMETRY & CLUSTER HEALTH STUDIO -->
+  <section class="telemetry-section" id="telemetry">
+    <div class="section-label">Distributed System Telemetry</div>
+    <h2 class="section-title">Cluster & Pipeline Observability</h2>
+    <p class="section-sub">Real-time metrics, circuit breaker states, job queue depths, and rate-limiting telemetry from Phase 3 distributed infrastructure.</p>
+
+    <div class="telemetry-grid reveal">
+      <!-- Card 1: Priority Job Queue & DLQ Monitor -->
+      <div class="telemetry-card">
+        <div class="telemetry-header">
+          <div class="telemetry-title"><span>⚡</span> Priority Job Queue</div>
+          <div class="telemetry-badge" id="telemetryQueueStatus">ACTIVE</div>
+        </div>
+        <div class="telemetry-stat-row">
+          <span class="telemetry-key">Queue Depth (Min-Heap):</span>
+          <span class="telemetry-val cyan" id="telemetryQueueDepth">0 jobs</span>
+        </div>
+        <div class="telemetry-stat-row">
+          <span class="telemetry-key">Active Worker Threads:</span>
+          <span class="telemetry-val green" id="telemetryActiveWorkers">0 / 2</span>
+        </div>
+        <div class="telemetry-stat-row">
+          <span class="telemetry-key">Dead-Letter Queue (DLQ):</span>
+          <span class="telemetry-val red" id="telemetryDlqDepth">0 dead</span>
+        </div>
+        <button class="telemetry-action-btn" onclick="refreshQueueTelemetry()">Refresh Job Queue Details</button>
+      </div>
+
+      <!-- Card 2: 3-State Circuit Breaker Monitor -->
+      <div class="telemetry-card">
+        <div class="telemetry-header">
+          <div class="telemetry-title"><span>🛡️</span> Circuit Breakers</div>
+          <div class="telemetry-badge" id="telemetryCbState">CLOSED</div>
+        </div>
+        <div class="telemetry-stat-row">
+          <span class="telemetry-key">Target Dependency:</span>
+          <span class="telemetry-val">yfinance API</span>
+        </div>
+        <div class="telemetry-stat-row">
+          <span class="telemetry-key">Failure Rate (Window 20):</span>
+          <span class="telemetry-val green" id="telemetryCbRate">0.0%</span>
+        </div>
+        <div class="telemetry-stat-row">
+          <span class="telemetry-key">Blocked Requests:</span>
+          <span class="telemetry-val amber" id="telemetryCbBlocked">0</span>
+        </div>
+        <button class="telemetry-action-btn" onclick="resetCircuitBreaker('yfinance')">Reset Breaker override</button>
+      </div>
+
+      <!-- Card 3: Rate Limiter & Prometheus Metrics -->
+      <div class="telemetry-card">
+        <div class="telemetry-header">
+          <div class="telemetry-title"><span>📊</span> Observability Stream</div>
+          <div class="telemetry-badge">PROMETHEUS</div>
+        </div>
+        <div class="telemetry-stat-row">
+          <span class="telemetry-key">Token Bucket Capacity:</span>
+          <span class="telemetry-val cyan">20 tokens</span>
+        </div>
+        <div class="telemetry-stat-row">
+          <span class="telemetry-key">Inference L1/L2 Cache:</span>
+          <span class="telemetry-val green" id="telemetryCacheCount">0 / 0</span>
+        </div>
+        <div class="telemetry-stat-row">
+          <span class="telemetry-key">Prometheus Scrape:</span>
+          <span class="telemetry-val green">/metrics</span>
+        </div>
+        <button class="telemetry-action-btn" onclick="fetchPrometheusMetrics()">View Live Metric Snapshot</button>
+      </div>
+    </div>
+  </section>
+
   <!-- FAQ -->
   <section class="faq-section" id="faq">
+
     <div class="section-label">Questions</div>
     <h2 class="section-title">Frequently Asked</h2>
     <div class="faq-wrap">
@@ -1463,6 +1613,128 @@ Top Matches Identified:
 
   <script>
     const API = 'http://localhost:5000';
+
+    // ── TOAST NOTIFICATION SYSTEM ──
+    function showToast(message, type = 'info', title = null, duration = 4500) {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      
+      const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+      const titles = { success: 'Success', error: 'System Alert', info: 'Information', warning: 'Warning' };
+
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `
+        <div class="toast-icon">${icons[type] || 'ℹ️'}</div>
+        <div class="toast-body">
+          <div class="toast-title">${title || titles[type]}</div>
+          <div class="toast-msg">${message}</div>
+        </div>
+      `;
+      
+      container.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(40px)';
+        toast.style.transition = 'all 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+
+    // ── DISTRIBUTED TELEMETRY & CLUSTER HEALTH ──
+    async function fetchSystemTelemetry() {
+      try {
+        const [qRes, bRes, mRes] = await Promise.allSettled([
+          fetch(`${API}/api/v3/queue`),
+          fetch(`${API}/api/v3/breakers`),
+          fetch(`${API}/api/v3/metrics`)
+        ]);
+
+        if (qRes.status === 'fulfilled' && qRes.value.ok) {
+          const qData = await qRes.value.json();
+          document.getElementById('telemetryQueueDepth').textContent = `${qData.queue_size || 0} jobs`;
+          document.getElementById('telemetryActiveWorkers').textContent = `${qData.active_workers || 0} / ${qData.max_workers || 2}`;
+          document.getElementById('telemetryDlqDepth').textContent = `${qData.dead_letter_count || 0} dead`;
+          document.getElementById('telemetryQueueStatus').textContent = qData.running ? 'ACTIVE' : 'IDLE';
+          document.getElementById('telemetryQueueStatus').style.color = qData.running ? 'var(--green)' : 'var(--muted)';
+        }
+
+        if (bRes.status === 'fulfilled' && bRes.value.ok) {
+          const bData = await bRes.value.json();
+          const yf = bData.yfinance || {};
+          const state = yf.state || 'CLOSED';
+          const badge = document.getElementById('telemetryCbState');
+          badge.textContent = state;
+          badge.style.color = state === 'CLOSED' ? 'var(--green)' : state === 'HALF_OPEN' ? 'var(--amber)' : 'var(--red)';
+          document.getElementById('telemetryCbRate').textContent = `${((yf.failure_rate || 0) * 100).toFixed(1)}%`;
+          document.getElementById('telemetryCbBlocked').textContent = `${yf.failure_count || 0}`;
+        }
+      } catch (e) {
+        console.warn('Telemetry polling paused:', e);
+      }
+    }
+
+    function refreshQueueTelemetry() {
+      fetchSystemTelemetry();
+      showToast('Queue & Worker Telemetry synced from /api/v3/queue', 'success', 'Queue Synced');
+    }
+
+    async function resetCircuitBreaker(target) {
+      try {
+        const res = await fetch(`${API}/api/v3/breakers/reset`, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({service: target})
+        });
+        if(res.ok) {
+          showToast(`Circuit Breaker for '${target}' reset to CLOSED state`, 'success', 'Breaker Reset');
+          fetchSystemTelemetry();
+        } else {
+          showToast(`Failed to reset breaker for ${target}`, 'error', 'Breaker Error');
+        }
+      } catch(e) {
+        showToast(`Backend unreachable: ${e.message}`, 'error', 'Connection Error');
+      }
+    }
+
+    async function fetchPrometheusMetrics() {
+      try {
+        const res = await fetch(`${API}/metrics`);
+        if (res.ok) {
+          const text = await res.text();
+          const lines = text.split('\n').filter(l => l && !l.startsWith('#')).slice(0, 10).join('\n');
+          showToast(`Prometheus Metrics Snapshot:\n${lines}`, 'info', 'Metrics Telemetry', 6000);
+        } else {
+          showToast('Failed to scrape /metrics endpoint', 'warning');
+        }
+      } catch(e) {
+        showToast('Flask API offline — Start via: python app.py serve', 'error', 'API Offline');
+      }
+    }
+
+    // Auto-poll telemetry every 5s
+    setInterval(fetchSystemTelemetry, 5000);
+    fetchSystemTelemetry();
+
+    // ── KEYBOARD SHORTCUT LISTENER ──
+    document.addEventListener('keydown', (e) => {
+      // ⌘K or / to focus ticker input
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' || (e.key === '/' && document.activeElement.tagName !== 'INPUT')) {
+        e.preventDefault();
+        const input = document.getElementById('regimeTicker') || document.getElementById('heroTickerInput');
+        if (input) {
+          input.focus();
+          input.select();
+          showToast('Quick Command Mode Activated', 'info', 'Keyboard Shortcut', 2000);
+        }
+      }
+      // Esc to dismiss toasts
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.toast').forEach(t => t.remove());
+      }
+    });
+
 
     // Particles
     const pc = document.getElementById('particles');
@@ -1751,8 +2023,11 @@ Top Matches Identified:
         await new Promise(r => setTimeout(r, 900));
 
         displayRegime(data);
+        showToast(`Regime classification complete for ${ticker}`, 'success', 'Analysis Complete');
         dashboard.scrollIntoView({behavior:'smooth',block:'start'});
-      } catch(e){alert(`Error: ${e.message}\n\nStart Flask: python app.py serve`);}
+      } catch(e){
+        showToast(`${e.message} — Ensure Flask server is running: python app.py serve`, 'error', 'Execution Error', 6000);
+      }
       finally{btn.disabled=false;btn.textContent='Analyze Regime →';loading.style.display='none';}
     });
 
@@ -1821,7 +2096,11 @@ Top Matches Identified:
         fill.style.width='100%'; addLog('✓ Done!');
         setTimeout(()=>{bar.style.display='none';fill.style.width='0';},2000);
         document.getElementById('predictResults').scrollIntoView({behavior:'smooth'});
-      } catch(e){addLog(`✗ ${e.message}`);alert(`Error: ${e.message}\n\nStart Flask: python app.py serve`);}
+        showToast(`Neural Network training complete for ${ticker} (${model})`, 'success', 'Model Trained');
+      } catch(e){
+        addLog(`✗ ${e.message}`);
+        showToast(`${e.message} — Ensure Flask server is running: python app.py serve`, 'error', 'Training Error', 6000);
+      }
       finally{btn.disabled=false;btxt.textContent='Train & Analyze';}
     });
 
