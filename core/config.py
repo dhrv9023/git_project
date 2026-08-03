@@ -43,6 +43,39 @@ class AppConfig:
     max_worker_threads:     int   = 2
     scheduler_interval_s:   int   = 3600        # staleness check every hour
 
+    # ── Phase 3: Distributed Systems ─────────────────────────────────────────
+    # Parallel data fetch: number of concurrent yfinance download threads
+    fetch_parallelism:          int   = 4
+
+    # Circuit breaker: yfinance API
+    cb_failure_threshold:       float = 0.5     # open if 50% of window fails
+    cb_window_size:             int   = 20      # sliding window size
+    cb_reset_timeout_s:         float = 60.0    # seconds before half-open probe
+
+    # Rate limiter: per-IP burst + sustained
+    rate_limit_burst:           float = 20.0    # token bucket capacity
+    rate_limit_rate:            float = 5.0     # tokens per second refill
+    rate_limit_window_max:      int   = 30      # max requests per window
+    rate_limit_window_s:        float = 60.0    # window duration (seconds)
+
+    # Batch predictor
+    batch_predictor_max_batch:  int   = 32      # sequences per forward pass
+    batch_predictor_max_wait_ms:float = 50.0    # ms to wait before flushing
+
+    # Retry policy for training jobs
+    job_max_retries:            int   = 3
+    job_retry_base_delay_s:     float = 5.0
+    job_retry_max_delay_s:      float = 300.0
+
+    # Priority job queue
+    use_priority_queue:         bool  = True    # Phase 3 queue vs Phase 2 pool
+
+    # Model store: parallel I/O workers
+    store_io_workers:           int   = 3
+
+    # Inference cache: max in-memory entries (LRU eviction)
+    cache_max_memory_entries:   int   = 100
+
     # ── Server ────────────────────────────────────────────────────────────────
     host:   str = "0.0.0.0"
     port:   int = 5000

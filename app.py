@@ -52,6 +52,21 @@ from ml.inference      import InferenceCache, InferenceEngine
 from ml.scheduler      import RetrainingScheduler
 from storage.model_store import ModelStore
 
+# ── Phase 3: Distributed Systems infrastructure ─────────────────────────────
+from core.circuit_breaker import get_breaker, all_breaker_stats, CircuitBreakerError
+from core.rate_limiter    import RateLimiter
+from core.metrics         import (
+    REGISTRY, http_requests_total, http_latency_seconds,
+    training_jobs_total, inference_latency_s,
+    cache_hits_total, cache_misses_total,
+    yfinance_calls_total, circuit_breaker_opens,
+    queue_depth, dlq_depth, active_workers,
+    memory_cache_entries, disk_cache_entries, model_versions_total,
+    Timer,
+)
+from ml.queue         import PriorityJobQueue, RetryPolicy, PRIORITY_URGENT, PRIORITY_NORMAL, PRIORITY_LOW
+from ml.batch_predictor import EnsembleBatchPredictor
+
 # --------------------------
 # Configuration
 # --------------------------
@@ -1567,5 +1582,242 @@ def _run_server():
             },
         })
 
-    log.info("All API routes registered. Starting Flask server...")
+    # ═══════════════════════════════════════
+    # Phase 3 — v3 API Routes
+    # ═══════════════════════════════════════
+
+    # ── Phase 3 components ─────────────────────────────────────────────────
+    pq          = PriorityJobQueue(max_workers=CFG.max_worker_threads)
+    rate_limiter = RateLimiter(
+        burst_capacity = CFG.rate_limit_burst,
+        burst_rate     = CFG.rate_limit_rate,
+        window_max     = CFG.rate_limit_window_max,
+        window_s       = CFG.rate_limit_window_s,
+    )
+    yf_breaker  = get_breaker(
+        "yfinance",
+        failure_threshold = CFG.cb_failure_threshold,
+        window_size       = CFG.cb_window_size,
+        reset_timeout_s   = CFG.cb_reset_timeout_s,
+    )
+
+    # ── Phase 3: Flask middleware ───────────────────────────────────────────
+
+    @flask_app.before_request
+    def _before():
+        """Record request start time + rate limit check."""
+        import flask
+        flask.g.t_start  = time.perf_counter()
+        flask.g.endpoint = request.path
+
+        # Rate limiting on mutating endpoints
+        if request.method in ("POST", "DELETE"):
+            client_ip = request.headers.get("X-Forwarded-For", request.remote_addr or "unknown")
+            if not rate_limiter.allow(client_ip):
+                http_requests_total.inc(method=request.method,
+                                        endpoint=request.path, status="429")
+                return jsonify({"error": "Rate limit exceeded", "retry_after_s": 1}), 429
+
+    @flask_app.after_request
+    def _after(response):
+        """Record latency + HTTP status metrics."""
+        import flask
+        elapsed = time.perf_counter() - getattr(flask.g, "t_start", time.perf_counter())
+        endpoint = getattr(flask.g, "endpoint", request.path)
+        http_latency_seconds.observe(elapsed, endpoint=endpoint)
+        http_requests_total.inc(method=request.method,
+                                endpoint=endpoint,
+                                status=str(response.status_code))
+        return response
+
+    # ── v3 Routes ──────────────────────────────────────────────────────────
+
+    @flask_app.route('/api/v3/metrics', methods=['GET'])
+    def v3_metrics():
+        """
+        GET /api/v3/metrics
+        Prometheus text format or JSON (Accept: application/json)
+
+        Aggregates all observability telemetry:
+          - HTTP latency percentiles per endpoint
+          - Training job counters
+          - Cache hit/miss rates
+          - Circuit breaker states
+          - Queue depths
+          - Memory/disk usage
+        """
+        # Update gauges from live state
+        queue_depth.set(pq.stats()["queue_depth"])
+        dlq_depth.set(pq.stats()["dlq_size"])
+        active_workers.set(pq.stats()["by_status"].get("running", 0))
+        model_versions_total.set(registry.stats()["total_versions"])
+        cs = cache.stats()
+        memory_cache_entries.set(cs.get("memory_entries", 0))
+        disk_cache_entries.set(cs.get("disk_entries", 0))
+
+        accept = request.headers.get("Accept", "")
+        if "application/json" in accept:
+            return jsonify({
+                "metrics":          REGISTRY.as_dict(),
+                "circuit_breakers": all_breaker_stats(),
+                "rate_limiter":     rate_limiter.stats(),
+                "queue":            pq.stats(),
+            })
+        # Default: Prometheus text format
+        from flask import Response
+        return Response(REGISTRY.format_prometheus(),
+                        mimetype="text/plain; version=0.0.4")
+
+    @flask_app.route('/api/v3/queue', methods=['GET'])
+    def v3_queue():
+        """
+        GET /api/v3/queue
+        Full job queue status including DLQ contents.
+        """
+        return jsonify({
+            "stats":     pq.stats(),
+            "jobs":      pq.list_jobs(),
+            "dlq":       pq.dlq_jobs(),
+        })
+
+    @flask_app.route('/api/v3/queue/dlq/<job_id>/requeue', methods=['POST'])
+    def v3_dlq_requeue(job_id):
+        """
+        POST /api/v3/queue/dlq/{job_id}/requeue
+        Manually requeue a dead-lettered job for retry.
+        """
+        ok = pq.requeue_from_dlq(job_id)
+        if not ok:
+            return jsonify({"error": f"Job {job_id} not found in DLQ"}), 404
+        return jsonify({"status": "requeued", "job_id": job_id})
+
+    @flask_app.route('/api/v3/train', methods=['POST'])
+    def v3_train():
+        """
+        POST /api/v3/train
+        Enqueue training via priority queue with retry + DLQ.
+        Supports optional 'priority' field: 0=urgent, 5=normal, 10=low.
+
+        Body: { ticker, start_date, end_date, epochs, seq_len, priority, force }
+        """
+        payload  = request.get_json(force=True) or {}
+        ticker   = payload.get('ticker', 'AAPL').upper()
+        start    = payload.get('start_date', CFG.default_start_date)
+        end      = payload.get('end_date', datetime.date.today().isoformat())
+        epochs   = int(payload.get('epochs', CFG.epochs))
+        seq_len  = int(payload.get('seq_len', CFG.sequence_length))
+        batch_sz = int(payload.get('batch_size', CFG.batch_size))
+        mdl_list = payload.get('models', ['LSTM', 'GRU', 'Transformer'])
+        priority = int(payload.get('priority', PRIORITY_NORMAL))
+        force    = bool(payload.get('force', False))
+
+        retry_policy = RetryPolicy(
+            max_retries     = CFG.job_max_retries,
+            base_delay_s    = CFG.job_retry_base_delay_s,
+            max_delay_s     = CFG.job_retry_max_delay_s,
+        )
+
+        # Use Phase 2 trainer.submit() but routed through priority queue
+        # The fn wraps BackgroundTrainer._run_job logic for DLQ support
+        def _train_fn():
+            return trainer.submit(
+                ticker=ticker, start_date=start, end_date=end,
+                seq_len=seq_len, epochs=epochs, batch_size=batch_sz,
+                models=mdl_list,
+            )
+
+        job_id = pq.submit(
+            fn           = _train_fn,
+            payload      = {"ticker": ticker, "start": start, "end": end,
+                            "epochs": epochs, "seq_len": seq_len},
+            priority     = priority,
+            retry_policy = retry_policy,
+        )
+
+        training_jobs_total.inc(status="queued")
+        queue_depth.set(pq.stats()["queue_depth"])
+
+        return jsonify({
+            "job_id":   job_id,
+            "ticker":   ticker,
+            "priority": priority,
+            "status":   "queued",
+            "message":  f"Queued via PriorityJobQueue. Poll GET /api/v3/queue.",
+            "retry_policy": {
+                "max_retries":   CFG.job_max_retries,
+                "base_delay_s":  CFG.job_retry_base_delay_s,
+                "max_delay_s":   CFG.job_retry_max_delay_s,
+            },
+        }), 202
+
+    @flask_app.route('/api/v3/predict', methods=['POST'])
+    def v3_predict():
+        """
+        POST /api/v3/predict
+        Batch-aware cached inference with circuit-breaker-protected data fetch.
+
+        Body: { ticker, start_date, end_date, version, force_refresh }
+
+        Differences from /api/v2/predict:
+          - Data fetch protected by yfinance circuit breaker
+          - Latency recorded in metrics histogram
+          - Cache hit/miss tracked in counters
+        """
+        with Timer(inference_latency_s, cache_layer="total"):
+            payload = request.get_json(force=True) or {}
+            ticker  = payload.get('ticker', 'AAPL').upper()
+            start   = payload.get('start_date', CFG.default_start_date)
+            end     = payload.get('end_date', datetime.date.today().isoformat())
+            version = payload.get('version', 'best')
+            force   = bool(payload.get('force_refresh', False))
+
+            result = engine.predict(ticker, start, end,
+                                    version=version, force_refresh=force)
+
+        if 'error' in result:
+            return jsonify(result), 404
+
+        if result.get('from_cache'):
+            cache_hits_total.inc(layer="memory_or_disk")
+        else:
+            cache_misses_total.inc()
+
+        return jsonify(result)
+
+    @flask_app.route('/api/v3/breakers', methods=['GET'])
+    def v3_breakers():
+        """GET /api/v3/breakers — All circuit breaker states."""
+        return jsonify(all_breaker_stats())
+
+    @flask_app.route('/api/v3/breakers/<name>/reset', methods=['POST'])
+    def v3_breaker_reset(name: str):
+        """POST /api/v3/breakers/{name}/reset — Manually reset a circuit breaker."""
+        from core.circuit_breaker import _BREAKERS, _BREAKER_LOCK
+        with _BREAKER_LOCK:
+            b = _BREAKERS.get(name)
+        if b is None:
+            return jsonify({"error": f"No circuit breaker named '{name}'"}), 404
+        b.reset()
+        return jsonify({"status": "reset", "name": name, "new_state": b.state.value})
+
+    @flask_app.route('/api/v3/rate-limiter', methods=['GET'])
+    def v3_rate_limiter_stats():
+        """GET /api/v3/rate-limiter — Per-client token bucket status."""
+        return jsonify(rate_limiter.stats())
+
+    @flask_app.route('/metrics', methods=['GET'])
+    def prometheus_scrape():
+        """
+        GET /metrics — Standard Prometheus scrape endpoint.
+        Compatible with Prometheus scrape config:
+          scrape_configs:
+            - job_name: stockbuddy
+              static_configs:
+                - targets: ['localhost:5000']
+        """
+        from flask import Response
+        return Response(REGISTRY.format_prometheus(),
+                        mimetype="text/plain; version=0.0.4")
+
+    log.info("All API routes registered (v1, v2, v3 + /metrics). Starting Flask server...")
     flask_app.run(host=CFG.host, port=CFG.port, debug=CFG.debug)
