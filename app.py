@@ -8,7 +8,7 @@ v1 API routes  → /api/regime, /api/predict, /api/wf_validate   (unchanged, bac
 v2 API routes  → /api/v2/*                                       (Phase 2 additions)
 """
 
-import os
+
 import sys
 import math
 import logging
@@ -30,10 +30,10 @@ import matplotlib.pyplot as plt
 
 try:
     import yfinance as yf
-except Exception as e:
+except Exception:
     raise RuntimeError("yfinance is required. Install with: pip install yfinance")
 
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 import tensorflow as tf
@@ -53,19 +53,18 @@ from ml.scheduler      import RetrainingScheduler
 from storage.model_store import ModelStore
 
 # ── Phase 3: Distributed Systems infrastructure ─────────────────────────────
-from core.circuit_breaker import get_breaker, all_breaker_stats, CircuitBreakerError
+from core.circuit_breaker import get_breaker, all_breaker_stats
 from core.rate_limiter    import RateLimiter
 from core.metrics         import (
     REGISTRY, http_requests_total, http_latency_seconds,
     training_jobs_total, inference_latency_s,
     cache_hits_total, cache_misses_total,
-    yfinance_calls_total, circuit_breaker_opens,
     queue_depth, dlq_depth, active_workers,
     memory_cache_entries, disk_cache_entries, model_versions_total,
     Timer,
 )
-from ml.queue         import PriorityJobQueue, RetryPolicy, PRIORITY_URGENT, PRIORITY_NORMAL, PRIORITY_LOW
-from ml.batch_predictor import EnsembleBatchPredictor
+from ml.queue         import PriorityJobQueue, RetryPolicy, PRIORITY_NORMAL
+
 
 # --------------------------
 # Configuration
@@ -393,7 +392,6 @@ def split_and_scale_data(X_raw: np.ndarray, y_raw: np.ndarray, dates, base_price
     n = len(X_raw)
     n_train = int(n * train_split)
     n_val   = int(n * val_split)
-    n_test  = n - n_train - n_val
     seq_len = sequence_length
 
     # --- Step 1: Chronological split of RAW arrays ---
@@ -1014,9 +1012,9 @@ def walk_forward_validate(ticker: str, start_date: str, end_date: str,
 
     # Prepare raw data once (no scaling — scaling happens per fold)
     data = prepare_data(ticker, start_date, end_date, CONFIG['sequence_length'])
-    X_raw  = data['X_raw']
-    y_raw  = data['y_raw']
-    dates  = data['dates_raw']
+    X_raw   = data['X_raw']
+    y_raw   = data['y_raw']
+    # dates_raw not used directly; fold windows are sliced by integer index
     base   = data['base_prices_raw']
     seq_len = data['sequence_length']
 
@@ -1174,12 +1172,10 @@ def main():
         print(f"{k}: {v:.2f}")
 
 
-if __name__ == '__main__':
-    import sys as _sys
-    if len(_sys.argv) > 1 and _sys.argv[1].lower() in {"serve", "server", "api"}:
-        _run_server()
-    else:
-        main()
+# __main__ entry-point is at the bottom of the file (after _run_server is defined)
+
+
+import time  # required by Phase 3 before_request / after_request middleware
 
 
 def _run_server():
@@ -1594,7 +1590,8 @@ def _run_server():
         window_max     = CFG.rate_limit_window_max,
         window_s       = CFG.rate_limit_window_s,
     )
-    yf_breaker  = get_breaker(
+    # Register yfinance circuit breaker (get_breaker stores it in global registry by name)
+    get_breaker(
         "yfinance",
         failure_threshold = CFG.cb_failure_threshold,
         window_size       = CFG.cb_window_size,
@@ -1709,7 +1706,7 @@ def _run_server():
         batch_sz = int(payload.get('batch_size', CFG.batch_size))
         mdl_list = payload.get('models', ['LSTM', 'GRU', 'Transformer'])
         priority = int(payload.get('priority', PRIORITY_NORMAL))
-        force    = bool(payload.get('force', False))
+        # 'force' field reserved for future cache-bust behaviour; ignored for now
 
         retry_policy = RetryPolicy(
             max_retries     = CFG.job_max_retries,
@@ -1742,7 +1739,7 @@ def _run_server():
             "ticker":   ticker,
             "priority": priority,
             "status":   "queued",
-            "message":  f"Queued via PriorityJobQueue. Poll GET /api/v3/queue.",
+            "message":  "Queued via PriorityJobQueue. Poll GET /api/v3/queue.",
             "retry_policy": {
                 "max_retries":   CFG.job_max_retries,
                 "base_delay_s":  CFG.job_retry_base_delay_s,
@@ -1857,3 +1854,13 @@ def _run_server():
 
     log.info("All API routes registered (v1, v2, v3, v5 + /metrics). Starting Flask server...")
     flask_app.run(host=CFG.host, port=CFG.port, debug=CFG.debug)
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+# Placed AFTER _run_server() definition so the forward-reference is resolved.
+if __name__ == '__main__':
+    import sys as _sys
+    if len(_sys.argv) > 1 and _sys.argv[1].lower() in {"serve", "server", "api"}:
+        _run_server()
+    else:
+        main()
