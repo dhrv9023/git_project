@@ -1,0 +1,34 @@
+# Git & Version Control
+.git
+.gitignore
+.github
+
+# Python & Environment
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# IDE & Editor Configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local runtime & data dumps
+.env
+*.log
+model_artifacts/
+inference_cache/
+StockBuddy_Portfolio_Review.docx
+
+# Documentation & Markdown (optional for container runtime)
+PHASE_*.md
+PROJECT_SUMMARY.md

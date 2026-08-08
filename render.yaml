@@ -1,0 +1,27 @@
+# Render Infrastructure as Code Blueprint
+# Learn more: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: stockbuddy
+    env: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: HOST
+        value: 0.0.0.0
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_FORMAT
+        value: json
+      - key: SB_FETCH_PARALLELISM
+        value: 4
+      - key: SB_MAX_WORKER_THREADS
+        value: 2
+      - key: SENTRY_DSN
+        sync: false  # Add in Render dashboard

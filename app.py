@@ -9,6 +9,7 @@ v2 API routes  → /api/v2/*                                       (Phase 2 addi
 """
 
 
+import os
 import sys
 import math
 import logging
@@ -16,13 +17,55 @@ import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
-# Configure structured logging before anything else
+import json
+import time
+
+_SERVER_START_TIME = time.time()
+
+# ── Phase 6: Production Logging & Error Tracking Configuration ─────────────────
+from core.config import CFG
+
+class JSONFormatter(logging.Formatter):
+    """Structured JSON log formatter for production monitoring / CloudWatch / Datadog."""
+    def format(self, record):
+        log_obj = {
+            "timestamp": datetime.datetime.fromtimestamp(record.created, tz=datetime.timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "environment": getattr(CFG, "environment", "development"),
+        }
+        if record.exc_info:
+            log_obj["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_obj)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
 )
 log = logging.getLogger('stockbuddy')
+
+if getattr(CFG, "log_format", "").lower() == "json" or getattr(CFG, "environment", "") == "production":
+    for handler in logging.root.handlers:
+        handler.setFormatter(JSONFormatter())
+
+# Sentry Error Tracking Integration
+if getattr(CFG, "sentry_dsn", ""):
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.flask import FlaskIntegration
+        sentry_sdk.init(
+            dsn=CFG.sentry_dsn,
+            environment=getattr(CFG, "environment", "development"),
+            integrations=[FlaskIntegration()],
+            traces_sample_rate=1.0 if CFG.environment != "production" else 0.2,
+        )
+        log.info(f"[Phase6] Sentry SDK initialized for environment: {CFG.environment}")
+    except ImportError:
+        log.warning("[Phase6] SENTRY_DSN configured but sentry-sdk package is not installed.")
+    except Exception as exc:
+        log.warning(f"[Phase6] Failed to initialize Sentry SDK: {exc}")
 
 import numpy as np
 import pandas as pd
@@ -1178,8 +1221,8 @@ def main():
 import time  # required by Phase 3 before_request / after_request middleware
 
 
-def _run_server():
-    """Initialize Phase 2 infrastructure and start the Flask server."""
+def create_app():
+    """Initialize Phase 2-6 infrastructure and return configured Flask application instance."""
 
     # ── Initialize Phase 2 components ──────────────────────────────────────────
     store          = ModelStore(base_dir=CFG.model_artifacts_dir)
@@ -1617,7 +1660,7 @@ def _run_server():
 
     @flask_app.after_request
     def _after(response):
-        """Record latency + HTTP status metrics."""
+        """Record latency + HTTP status metrics and apply security headers."""
         import flask
         elapsed = time.perf_counter() - getattr(flask.g, "t_start", time.perf_counter())
         endpoint = getattr(flask.g, "endpoint", request.path)
@@ -1625,7 +1668,88 @@ def _run_server():
         http_requests_total.inc(method=request.method,
                                 endpoint=endpoint,
                                 status=str(response.status_code))
+
+        # ── Phase 6: Security Headers Middleware ──────────────────────────────
+        if getattr(CFG, "security_headers_enabled", True):
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-Frame-Options"] = "SAMEORIGIN"
+            response.headers["X-XSS-Protection"] = "1; mode=block"
+            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data:; "
+                "img-src 'self' data: https:; "
+                "style-src 'self' 'unsafe-inline' https:;"
+            )
+            if not CFG.debug and getattr(CFG, "environment", "") in ("production", "staging"):
+                response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
         return response
+
+    # ── Phase 6: Container Health & Readiness Probes ───────────────────────
+
+    @flask_app.route('/health', methods=['GET'])
+    def container_health():
+        """
+        GET /health — Container Liveness Probe (K8s / Docker / Render / Railway).
+        Returns HTTP 200 if process is running and alive.
+        """
+        uptime_s = round(time.time() - _SERVER_START_TIME, 2)
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'uptime_seconds': uptime_s,
+            'environment': getattr(CFG, "environment", "development"),
+            'version': '6.0.0',
+        }), 200
+
+    @flask_app.route('/ready', methods=['GET'])
+    def container_ready():
+        """
+        GET /ready — Container Readiness Probe.
+        Checks if model storage directory is writable, circuit breaker is healthy,
+        and priority job queue is accepting work. Returns 200 if ready, 503 if unready.
+        """
+        checks = {}
+        is_ready = True
+
+        # Check 1: Artifact storage directory
+        try:
+            os.makedirs(CFG.model_artifacts_dir, exist_ok=True)
+            test_path = os.path.join(CFG.model_artifacts_dir, ".health_check_tmp")
+            with open(test_path, "w") as f:
+                f.write("ok")
+            if os.path.exists(test_path):
+                os.remove(test_path)
+            checks['storage_writable'] = True
+        except Exception as exc:
+            checks['storage_writable'] = False
+            checks['storage_error'] = str(exc)
+            is_ready = False
+
+        # Check 2: yfinance circuit breaker state
+        try:
+            yf_b = get_breaker("yfinance")
+            checks['circuit_breaker_state'] = yf_b.state.value
+            if yf_b.state.value == "OPEN":
+                checks['circuit_breaker_warning'] = "yfinance circuit breaker is currently OPEN"
+        except Exception:
+            checks['circuit_breaker_state'] = "unknown"
+
+        # Check 3: Priority Queue stats
+        try:
+            checks['queue_stats'] = pq.stats()
+            checks['queue_healthy'] = True
+        except Exception:
+            checks['queue_healthy'] = False
+            is_ready = False
+
+        status_code = 200 if is_ready else 503
+        return jsonify({
+            'status': 'ready' if is_ready else 'unready',
+            'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'checks': checks
+        }), status_code
+
 
     # ── v3 Routes ──────────────────────────────────────────────────────────
 
@@ -1852,12 +1976,22 @@ def _run_server():
         return Response(REGISTRY.format_prometheus(),
                         mimetype="text/plain; version=0.0.4")
 
-    log.info("All API routes registered (v1, v2, v3, v5 + /metrics). Starting Flask server...")
+    log.info("All API routes registered (v1, v2, v3, v5, v6 + /health + /ready + /metrics).")
+    return flask_app
+
+
+# ── Global WSGI Application Instance ──────────────────────────────────────────
+# Instantiated at module level for Gunicorn (app:flask_app), pytest, and server launch.
+flask_app = create_app()
+
+
+def _run_server():
+    """Start the Flask development / WSGI server."""
+    log.info(f"Starting StockBuddy server on {CFG.host}:{CFG.port} (environment={CFG.environment})...")
     flask_app.run(host=CFG.host, port=CFG.port, debug=CFG.debug)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
-# Placed AFTER _run_server() definition so the forward-reference is resolved.
 if __name__ == '__main__':
     import sys as _sys
     if len(_sys.argv) > 1 and _sys.argv[1].lower() in {"serve", "server", "api"}:

@@ -37,6 +37,9 @@ MANIFEST
 .env
 .env.local
 .env.*.local
+nginx/certs/
+*.key
+*.crt
 
 # ─── IDE & Editor settings ───────────────────────────────────────────────────
 .vscode/

@@ -76,25 +76,52 @@ class AppConfig:
     # Inference cache: max in-memory entries (LRU eviction)
     cache_max_memory_entries:   int   = 100
 
-    # ── Server ────────────────────────────────────────────────────────────────
+    # ── Server & Production (Phase 6) ──────────────────────────────────────────
     host:   str = "0.0.0.0"
     port:   int = 5000
     debug:  bool = False
+
+    environment:              str  = "development"  # development | staging | production
+    sentry_dsn:               str  = ""
+    log_format:               str  = "text"         # text | json
+    security_headers_enabled: bool = True
 
     @classmethod
     def from_env(cls) -> "AppConfig":
         """
         Override any field via environment variables.
 
-        Convention:  SB_{FIELD_NAME_UPPER} = value
+        Convention:  SB_{FIELD_NAME_UPPER} = value (or standard env vars like PORT, HOST, SENTRY_DSN, ENVIRONMENT)
         Example:     SB_EPOCHS=50 python app.py serve
 
         Supports str / int / float / bool fields.
+        Automatically loads .env file if available.
         """
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            pass
+
         inst = cls()
         for f_name, f_type in cls.__annotations__.items():
+            # Check primary prefix SB_{FIELD} first, then fallback to standard env names
             env_key = f"SB_{f_name.upper()}"
             env_val = os.environ.get(env_key)
+
+            if env_val is None:
+                # Direct fallback mapping for standard cloud platform env vars
+                std_keys = {
+                    "port": "PORT",
+                    "host": "HOST",
+                    "debug": "DEBUG",
+                    "environment": "ENVIRONMENT",
+                    "sentry_dsn": "SENTRY_DSN",
+                    "log_format": "LOG_FORMAT",
+                }
+                if f_name in std_keys:
+                    env_val = os.environ.get(std_keys[f_name])
+
             if env_val is not None:
                 try:
                     if f_type in (int,):
@@ -102,7 +129,7 @@ class AppConfig:
                     elif f_type in (float,):
                         setattr(inst, f_name, float(env_val))
                     elif f_type in (bool,):
-                        setattr(inst, f_name, env_val.lower() in ("1", "true", "yes"))
+                        setattr(inst, f_name, env_val.lower() in ("1", "true", "yes", "on"))
                     else:
                         setattr(inst, f_name, env_val)
                 except Exception:

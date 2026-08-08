@@ -44,7 +44,7 @@ import logging
 import threading
 from concurrent.futures import Future
 from dataclasses import dataclass, field
-from typing import Optional, List, Tuple, Any
+from typing import List
 import numpy as np
 
 log = logging.getLogger(__name__)

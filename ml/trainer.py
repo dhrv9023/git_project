@@ -25,7 +25,7 @@ import uuid
 import datetime
 import logging
 import threading
-from concurrent.futures import ThreadPoolExecutor, Future
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any
 
@@ -156,7 +156,7 @@ class BackgroundTrainer:
         # Late import: app.py functions are not importable at module level
         # because app.py isn't a package. We import the training functions
         # from the same process's global scope via sys.modules trick.
-        import sys, importlib
+        import sys
 
         # Mark running
         with self._lock:
@@ -173,7 +173,6 @@ class BackgroundTrainer:
             split_and_scale    = app_mod.split_and_scale_data
             train_models_fn    = app_mod.train_models
             evaluate_ensemble  = app_mod.evaluate_and_ensemble
-            build_callbacks    = None  # already in train_models
 
             cfg = self.cfg
 
@@ -194,7 +193,7 @@ class BackgroundTrainer:
             eval_results = evaluate_ensemble(models_dict, splits, splits["scaler_y"])
 
             # Build clean metrics dict (JSON-serializable)
-            import math, numpy as _np
+            import math
             def _clean(v):
                 if v is None: return None
                 if isinstance(v, float) and (math.isnan(v) or math.isinf(v)): return None

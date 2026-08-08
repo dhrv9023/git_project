@@ -43,7 +43,6 @@ Latency:    priority 0 = immediate, priority 10 = lowest priority
 
 import uuid
 import time
-import math
 import random
 import heapq
 import logging
