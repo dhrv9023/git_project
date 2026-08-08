@@ -1808,7 +1808,6 @@ def _run_server():
     # ── Phase 5: Quantitative Research Platform ───────────────────────────────
 
     @flask_app.route('/api/v5/quant', methods=['POST'])
-    @cross_origin()
     def v5_quant_research():
         """
         POST /api/v5/quant — Full quantitative research report.
