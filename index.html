@@ -799,7 +799,113 @@
       .pipe-arrow { display: none; }
     }
 
+    /* ── PHASE 5: QUANTITATIVE RESEARCH LAB ── */
+    .quant-lab-section { background: var(--bg2); }
+
+    /* Research console */
+    .qlab-console {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 14px;
+      padding: 1.4rem 1.8rem; display: flex; gap: 1rem; align-items: flex-end;
+      flex-wrap: wrap; margin-top: 2rem; box-shadow: 0 8px 30px rgba(0,0,0,.15);
+      transition: border-color .3s;
+    }
+    .qlab-console:focus-within { border-color: var(--cyan); }
+    .qlab-run-btn {
+      background: linear-gradient(135deg, var(--cyan), var(--green));
+      color: #080c10; border: none; border-radius: 8px; padding: .72rem 1.8rem;
+      font-size: .92rem; font-weight: 700; cursor: pointer; font-family: inherit;
+      transition: all .25s; white-space: nowrap; align-self: flex-end;
+    }
+    .qlab-run-btn:hover { box-shadow: 0 0 28px rgba(0,255,224,.45); transform: translateY(-2px); }
+    .qlab-run-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+    /* KPI metric cards row */
+    .qlab-kpi-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 1rem;
+      margin-top: 1.8rem;
+    }
+    @media (max-width: 1100px) { .qlab-kpi-grid { grid-template-columns: repeat(4, 1fr); } }
+    @media (max-width: 650px)  { .qlab-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    .qlab-kpi {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+      padding: 1.1rem 1rem; display: flex; flex-direction: column; gap: .3rem;
+      transition: border-color .25s, transform .2s;
+    }
+    .qlab-kpi:hover { border-color: rgba(0,255,224,.3); transform: translateY(-2px); }
+    .qlab-kpi-label { font-size: .68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    .qlab-kpi-val { font-size: 1.5rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: var(--cyan); }
+    .qlab-kpi-sub  { font-size: .7rem;  color: var(--muted); }
+
+    /* Chart panels grid */
+    .qlab-charts-2col {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; margin-top: 1.4rem;
+    }
+    @media (max-width: 900px) { .qlab-charts-2col { grid-template-columns: 1fr; } }
+    .qlab-charts-3col {
+      display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 1.4rem; margin-top: 1.4rem;
+    }
+    @media (max-width: 1100px) { .qlab-charts-3col { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 700px)  { .qlab-charts-3col { grid-template-columns: 1fr; } }
+
+    .qlab-panel {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 14px;
+      padding: 1.3rem 1.5rem; display: flex; flex-direction: column; gap: .8rem;
+    }
+    .qlab-panel-title {
+      font-size: .82rem; font-weight: 700; color: var(--cyan);
+      text-transform: uppercase; letter-spacing: .06em;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .qlab-sig-badge {
+      font-family: 'JetBrains Mono', monospace; font-size: .7rem; font-weight: 700;
+      padding: 3px 8px; border-radius: 6px;
+    }
+    .qlab-sig-badge.yes { background: rgba(0,255,136,.15); color: var(--green); border: 1px solid var(--green); }
+    .qlab-sig-badge.no  { background: rgba(255,51,102,.1);  color: var(--red);   border: 1px solid var(--red); }
+
+    /* Transition Matrix heatmap */
+    .tm-table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; }
+    .tm-table th { font-size: .62rem; color: var(--muted); padding: .3rem .2rem; text-align: center; }
+    .tm-table td {
+      font-size: .7rem; text-align: center; padding: .35rem .2rem;
+      border-radius: 4px; font-weight: 700; transition: opacity .2s;
+    }
+    .tm-row-label { font-size: .62rem; color: var(--muted); text-align: right; padding-right: .4rem; white-space: nowrap; }
+
+    /* Feature Importance bar */
+    .fi-bar-wrap { display: flex; flex-direction: column; gap: .6rem; }
+    .fi-bar-row  { display: flex; align-items: center; gap: .7rem; }
+    .fi-bar-label{ font-size: .75rem; color: var(--muted); min-width: 110px; text-align: right; font-family: 'JetBrains Mono', monospace; }
+    .fi-bar-track{ flex: 1; height: 10px; background: var(--bg3); border-radius: 999px; overflow: hidden; }
+    .fi-bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--cyan), var(--green)); transition: width .6s cubic-bezier(.16,1,.3,1); }
+    .fi-bar-pct  { font-size: .72rem; color: var(--cyan); font-weight: 700; font-family: 'JetBrains Mono', monospace; min-width: 40px; }
+
+    /* Walk-Forward table */
+    .wf-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    .wf-table th { color: var(--cyan); font-size: .72rem; text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--border); }
+    .wf-table td { color: var(--text); padding: .5rem .6rem; border-bottom: 1px solid rgba(0,255,224,.06); font-family: 'JetBrains Mono', monospace; }
+
+    /* IC stat row */
+    .ic-stat-row { display: flex; gap: 1.2rem; flex-wrap: wrap; }
+    .ic-stat { display: flex; flex-direction: column; gap: .15rem; }
+    .ic-stat-val { font-size: 1.1rem; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: var(--cyan); }
+    .ic-stat-key { font-size: .68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+    /* Confidence bar */
+    .conf-bar-wrap { display: flex; flex-direction: column; gap: .45rem; }
+    .conf-bar-row  { display: flex; align-items: center; gap: .6rem; font-size: .78rem; }
+    .conf-label    { min-width: 90px; color: var(--muted); font-size: .72rem; }
+    .conf-track    { flex: 1; height: 8px; background: var(--bg3); border-radius: 999px; overflow: hidden; }
+    .conf-fill     { height: 100%; border-radius: 999px; background: var(--cyan); transition: width .5s; }
+    .conf-pct      { font-size: .72rem; color: var(--cyan); font-weight: 700; min-width: 38px; font-family: 'JetBrains Mono', monospace; }
+
+    /* Loading overlay for quant lab */
+    .qlab-loading { display: none; text-align: center; padding: 3rem 1rem; }
+    .qlab-loading .spinner { margin: 0 auto 1rem; }
+    .qlab-results { display: none; }
+
   </style>
+
 </head>
 <body>
   <!-- TOAST NOTIFICATIONS CONTAINER -->
@@ -812,7 +918,9 @@
       <li><a href="#features">Architecture</a></li>
       <li><a href="#regime">Regime Engine <span class="kbd-shortcut">⌘K</span></a></li>
       <li><a href="#predict">Deep Learning</a></li>
+      <li><a href="#quant-lab" style="color:var(--cyan);">⚗️ Quant Lab</a></li>
       <li><a href="#telemetry">System Health</a></li>
+
       <li><a href="#how-it-works">How It Works</a></li>
       <li><a href="#faq">FAQ</a></li>
       <li>
@@ -898,11 +1006,177 @@
   </section>
 
 
+  <!-- ── PHASE 5: QUANTITATIVE RESEARCH LAB ── -->
+  <section class="quant-lab-section" id="quant-lab">
+    <div class="section-label">Phase 5 · Quantitative Research Platform</div>
+    <h2 class="section-title">Quantitative Research Lab</h2>
+    <p class="section-sub">17 institutional-grade metrics — Information Coefficient, Sharpe, Sortino, Calmar, Alpha/Beta, Rolling Vol, Monte Carlo, Regime Confidence, Walk-Forward Optimisation and more.</p>
+
+    <!-- Research Console -->
+    <div class="qlab-console reveal">
+      <div class="field-group">
+        <label for="qlabTicker">Ticker Symbol</label>
+        <input type="text" id="qlabTicker" value="AAPL" maxlength="10" placeholder="AAPL" style="width:100px;text-transform:uppercase;">
+      </div>
+      <div class="field-group">
+        <label for="qlabStart">Start Date</label>
+        <input type="date" id="qlabStart" value="2020-01-01">
+      </div>
+      <div class="field-group">
+        <label for="qlabEnd">End Date</label>
+        <input type="date" id="qlabEnd">
+      </div>
+      <div class="hero-chip-row">
+        <span class="hero-chip" onclick="qlabSetTicker('AAPL')">AAPL</span>
+        <span class="hero-chip" onclick="qlabSetTicker('NVDA')">NVDA</span>
+        <span class="hero-chip" onclick="qlabSetTicker('TSLA')">TSLA</span>
+        <span class="hero-chip" onclick="qlabSetTicker('MSFT')">MSFT</span>
+        <span class="hero-chip" onclick="qlabSetTicker('SPY')">SPY</span>
+      </div>
+      <button class="qlab-run-btn" id="qlabRunBtn" onclick="runQuantLab()">⚗️ Run Full Analysis</button>
+    </div>
+
+    <!-- Loading State -->
+    <div class="qlab-loading" id="qlabLoading">
+      <div class="spinner"></div>
+      <div id="qlabLoadingText" style="color:var(--muted);font-size:.9rem;">Initialising quantitative research pipeline...</div>
+    </div>
+
+    <!-- Results Container -->
+    <div class="qlab-results" id="qlabResults">
+
+      <!-- Row 1: 7 KPI Cards -->
+      <div class="qlab-kpi-grid">
+        <div class="qlab-kpi">
+          <div class="qlab-kpi-label">Sharpe Ratio</div>
+          <div class="qlab-kpi-val" id="kpiSharpe">—</div>
+          <div class="qlab-kpi-sub">vs BH: <span id="kpiSharpeBH">—</span></div>
+        </div>
+        <div class="qlab-kpi">
+          <div class="qlab-kpi-label">Sortino Ratio</div>
+          <div class="qlab-kpi-val" id="kpiSortino">—</div>
+          <div class="qlab-kpi-sub">Downside-adjusted</div>
+        </div>
+        <div class="qlab-kpi">
+          <div class="qlab-kpi-label">Calmar Ratio</div>
+          <div class="qlab-kpi-val" id="kpiCalmar">—</div>
+          <div class="qlab-kpi-sub">CAGR ÷ |MaxDD|</div>
+        </div>
+        <div class="qlab-kpi">
+          <div class="qlab-kpi-label">CAGR</div>
+          <div class="qlab-kpi-val" id="kpiCagr">—</div>
+          <div class="qlab-kpi-sub">BH: <span id="kpiCagrBH">—</span></div>
+        </div>
+        <div class="qlab-kpi">
+          <div class="qlab-kpi-label">Max Drawdown</div>
+          <div class="qlab-kpi-val" id="kpiMdd">—</div>
+          <div class="qlab-kpi-sub">BH: <span id="kpiMddBH">—</span></div>
+        </div>
+        <div class="qlab-kpi">
+          <div class="qlab-kpi-label">Alpha (vs SPY)</div>
+          <div class="qlab-kpi-val" id="kpiAlpha">—</div>
+          <div class="qlab-kpi-sub">Jensen's annualised</div>
+        </div>
+        <div class="qlab-kpi">
+          <div class="qlab-kpi-label">Beta (vs SPY)</div>
+          <div class="qlab-kpi-val" id="kpiBeta">—</div>
+          <div class="qlab-kpi-sub">Market sensitivity</div>
+        </div>
+      </div>
+
+      <!-- Row 2: IC + Statistical Significance | Rolling Volatility -->
+      <div class="qlab-charts-2col">
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">
+            Information Coefficient (60-day Rolling Spearman)
+            <span class="qlab-sig-badge" id="icSigBadge">—</span>
+          </div>
+          <div class="ic-stat-row">
+            <div class="ic-stat"><div class="ic-stat-val" id="icMean">—</div><div class="ic-stat-key">IC Mean</div></div>
+            <div class="ic-stat"><div class="ic-stat-val" id="icStd">—</div><div class="ic-stat-key">IC Std</div></div>
+            <div class="ic-stat"><div class="ic-stat-val" id="icIR">—</div><div class="ic-stat-key">IC-IR</div></div>
+            <div class="ic-stat"><div class="ic-stat-val" id="icPval">—</div><div class="ic-stat-key">p-value</div></div>
+          </div>
+          <canvas id="icChart" height="120"></canvas>
+        </div>
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">Rolling 30-Day Volatility (Annualised %)</div>
+          <canvas id="rollVolChart" height="140"></canvas>
+        </div>
+      </div>
+
+      <!-- Row 3: Rolling Sharpe | Drawdown -->
+      <div class="qlab-charts-2col" style="margin-top:1.4rem;">
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">Rolling 60-Day Sharpe Ratio</div>
+          <canvas id="rollSharpeChart" height="140"></canvas>
+        </div>
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">Strategy Drawdown (Underwater Equity %)</div>
+          <canvas id="ddChart" height="140"></canvas>
+        </div>
+      </div>
+
+      <!-- Row 4: Monte Carlo Fan Chart (full width) -->
+      <div class="qlab-panel" style="margin-top:1.4rem;">
+        <div class="qlab-panel-title">
+          Monte Carlo Simulation — 1,000 Paths × 252 Days
+          <span style="font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted);">Prob(Profit): <span id="mcProbProfit">—</span></span>
+        </div>
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:.6rem;">
+          <div class="ic-stat"><div class="ic-stat-val" id="mcP5">—</div><div class="ic-stat-key">5th Percentile</div></div>
+          <div class="ic-stat"><div class="ic-stat-val" id="mcP50">—</div><div class="ic-stat-key">Median (P50)</div></div>
+          <div class="ic-stat"><div class="ic-stat-val" id="mcP95">—</div><div class="ic-stat-key">95th Percentile</div></div>
+        </div>
+        <canvas id="mcChart" height="160"></canvas>
+      </div>
+
+      <!-- Row 5: Regime Transition Matrix | Feature Importance -->
+      <div class="qlab-charts-2col" style="margin-top:1.4rem;">
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">Regime Transition Probability Matrix (Markov)</div>
+          <div style="overflow-x:auto;"><div id="tmContainer"></div></div>
+        </div>
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">Feature Importance (Permutation vs KMeans Inertia)</div>
+          <div class="fi-bar-wrap" id="fiContainer"></div>
+        </div>
+      </div>
+
+      <!-- Row 6: Walk-Forward | Cross-Validation | Regime Confidence -->
+      <div class="qlab-charts-3col" style="margin-top:1.4rem;">
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">Walk-Forward Optimisation (5 Folds)</div>
+          <div style="font-size:.76rem;color:var(--muted);margin-bottom:.3rem;">Sharpe: <span id="wfMean" style="color:var(--cyan);font-weight:700;">—</span> ± <span id="wfStd">—</span></div>
+          <div style="overflow-x:auto;">
+            <table class="wf-table" id="wfTable">
+              <thead><tr><th>Fold</th><th>Period</th><th>Sharpe</th><th>Bull/Neut Thresh</th></tr></thead>
+              <tbody id="wfBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">Cross-Validation IC Stability (5-Fold)</div>
+          <div style="font-size:.76rem;color:var(--muted);margin-bottom:.5rem;">IC: <span id="cvMean" style="color:var(--cyan);font-weight:700;">—</span> ± <span id="cvStd">—</span></div>
+          <canvas id="cvChart" height="130"></canvas>
+        </div>
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">Regime Confidence</div>
+          <div style="font-size:.76rem;color:var(--muted);margin-bottom:.5rem;">Current: <span id="confCurrent" style="color:var(--cyan);font-weight:700;">—</span></div>
+          <div class="conf-bar-wrap" id="confContainer"></div>
+        </div>
+      </div>
+
+    </div><!-- /qlab-results -->
+  </section>
+
+
   <!-- INTERACTIVE SYSTEM EXPLORER -->
   <section class="features" id="features">
     <div class="section-label">Engine Architecture</div>
     <h2 class="section-title">The Three Quantitative Pillars</h2>
     <p class="section-sub">Instead of naive point-in-time price guesses, StockBuddy operates on statistically defensible quantitative pillars.</p>
+
 
     <div class="engine-explorer">
       <div class="explorer-tabs">
@@ -2403,7 +2677,294 @@ Top Matches Identified:
     } else {
       initAnimations();
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PHASE 5 — QUANTITATIVE RESEARCH LAB
+    // ════════════════════════════════════════════════════════════════════
+
+    // Set today as default end date for quant lab
+    document.getElementById('qlabEnd').value = new Date().toISOString().split('T')[0];
+
+    function qlabSetTicker(sym) {
+      document.getElementById('qlabTicker').value = sym;
+    }
+
+    // Chart instance registry for destroy-on-rerun
+    const qlabCharts = {};
+    function qlabChart(id, config) {
+      if (qlabCharts[id]) qlabCharts[id].destroy();
+      qlabCharts[id] = new Chart(document.getElementById(id), config);
+    }
+
+    const CHART_OPTS = {
+      responsive: true, animation: { duration: 600 },
+      plugins: {
+        legend: { labels: { color: '#e2e8f0', font: { size: 10 }, boxWidth: 14 } },
+        tooltip: { backgroundColor:'rgba(8,12,16,.95)', titleColor:'#00ffe0', bodyColor:'#e2e8f0',
+                   borderColor:'rgba(0,255,224,.2)', borderWidth:1 }
+      },
+      scales: {
+        x: { ticks: { color:'#8892a4', font:{ size:9 }, maxTicksLimit:8 }, grid:{ color:'rgba(0,255,224,0.05)' } },
+        y: { ticks: { color:'#8892a4', font:{ size:9 } }, grid:{ color:'rgba(0,255,224,0.05)' } }
+      }
+    };
+
+    function _col(v, pos='#00ff88', neg='#ff3366', neu='#00ffe0') {
+      if (v === null || v === undefined) return neu;
+      return v > 0 ? pos : v < 0 ? neg : neu;
+    }
+
+    function _fmt(v, suf='', dp=2) {
+      if (v === null || v === undefined) return '—';
+      return (v >= 0 ? '+' : '') + Number(v).toFixed(dp) + suf;
+    }
+
+    async function runQuantLab() {
+      const ticker = (document.getElementById('qlabTicker').value || 'AAPL').trim().toUpperCase();
+      const start  = document.getElementById('qlabStart').value;
+      const end    = document.getElementById('qlabEnd').value;
+      const btn    = document.getElementById('qlabRunBtn');
+      const load   = document.getElementById('qlabLoading');
+      const res    = document.getElementById('qlabResults');
+      const ltxt   = document.getElementById('qlabLoadingText');
+
+      btn.disabled = true; btn.textContent = '⏳ Computing…';
+      load.style.display = 'block'; res.style.display = 'none';
+
+      const steps = [
+        `Fetching ${ticker} & SPY OHLCV from yfinance…`,
+        'Engineering features (RSI, EMA, MACD, Vol)…',
+        'Running K-Means (k=6) regime clustering…',
+        'Computing IC, Sharpe, Sortino, Calmar, Alpha/Beta…',
+        'Rolling 30-day vol & 60-day Sharpe…',
+        'Running Monte Carlo (1,000 paths × 252 days)…',
+        'Building Markov Transition Matrix…',
+        'Permutation Feature Importance…',
+        'Walk-Forward Optimisation (5 folds)…',
+        'Cross-Validation IC stability…',
+        'Finalising research report…'
+      ];
+      let si = 0;
+      const stepInt = setInterval(() => {
+        if (ltxt && si < steps.length) ltxt.textContent = steps[si++];
+      }, 1200);
+
+      try {
+        const resp = await fetch(`${API}/api/v5/quant`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticker, start_date: start, end_date: end })
+        });
+        clearInterval(stepInt);
+        if (!resp.ok) {
+          const err = await resp.json();
+          showToast(err.error || `API ${resp.status}`, 'error', 'Quant Lab Error', 6000);
+          return;
+        }
+        const d = await resp.json();
+        renderQuantLab(d);
+        res.style.display = 'block';
+        res.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        showToast(`Research report complete for ${ticker}`, 'success', 'Quant Lab');
+      } catch(e) {
+        clearInterval(stepInt);
+        showToast(`${e.message} — Start Flask: python app.py serve`, 'error', 'Connection Error', 7000);
+      } finally {
+        btn.disabled = false; btn.textContent = '⚗️ Run Full Analysis';
+        load.style.display = 'none';
+      }
+    }
+
+    function renderQuantLab(d) {
+      const p = d.performance;
+
+      // ── KPI Cards ────────────────────────────────────────────────────
+      function setKpi(id, val, suf='', dp=2) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = (val === null || val === undefined) ? '—' : _fmt(val, suf, dp);
+        el.style.color = _col(val);
+      }
+      setKpi('kpiSharpe',  p.sharpe_ratio,  '', 2);
+      setKpi('kpiSortino', p.sortino_ratio, '', 2);
+      setKpi('kpiCalmar',  p.calmar_ratio,  '', 2);
+      setKpi('kpiCagr',    p.cagr,          '%', 1);
+      setKpi('kpiMdd',     p.max_drawdown,  '%', 1);
+      setKpi('kpiAlpha',   p.alpha,         '%', 2);
+      setKpi('kpiBeta',    p.beta,          '', 2);
+      document.getElementById('kpiSharpeBH').textContent = p.sharpe_bh?.toFixed(2) ?? '—';
+      document.getElementById('kpiCagrBH').textContent   = p.cagr_bh?.toFixed(1) + '%' ?? '—';
+      document.getElementById('kpiMddBH').textContent    = p.mdd_bh?.toFixed(1) + '%' ?? '—';
+
+      // ── IC Stats ─────────────────────────────────────────────────────
+      const ic = d.ic;
+      document.getElementById('icMean').textContent = ic.mean?.toFixed(4) ?? '—';
+      document.getElementById('icMean').style.color = _col(ic.mean);
+      document.getElementById('icStd').textContent  = ic.std?.toFixed(4)  ?? '—';
+      document.getElementById('icIR').textContent   = ic.ir?.toFixed(2)   ?? '—';
+      document.getElementById('icIR').style.color   = _col(ic.ir);
+      document.getElementById('icPval').textContent = ic.p_value?.toFixed(4) ?? '—';
+      const sigBadge = document.getElementById('icSigBadge');
+      sigBadge.textContent = ic.significant ? 'SIGNIFICANT ✓' : 'NOT SIG ✗';
+      sigBadge.className   = 'qlab-sig-badge ' + (ic.significant ? 'yes' : 'no');
+
+      // IC time-series chart
+      qlabChart('icChart', {
+        type: 'line',
+        data: { labels: ic.dates, datasets: [{
+          label: 'IC (60-day rolling)', data: ic.series,
+          borderColor: '#00ffe0', borderWidth: 1.5, pointRadius: 0, tension: .4,
+          fill: { target: 'origin', above:'rgba(0,255,224,.07)', below:'rgba(255,51,102,.07)' }
+        }, {
+          label: 'IC = 0', data: Array(ic.dates.length).fill(0),
+          borderColor: 'rgba(255,255,255,.2)', borderDash:[4,4], borderWidth:1, pointRadius:0
+        }]},
+        options: { ...CHART_OPTS, plugins: { ...CHART_OPTS.plugins, legend: { display: false } } }
+      });
+
+      // ── Rolling Volatility ───────────────────────────────────────────
+      const r = d.rolling;
+      qlabChart('rollVolChart', {
+        type: 'line',
+        data: { labels: r.dates, datasets: [{
+          label: 'Rolling 30d Vol (%)', data: r.volatility,
+          borderColor: '#ffaa00', borderWidth: 1.5, pointRadius: 0, tension: .3,
+          fill: { target:'origin', above:'rgba(255,170,0,.08)' }
+        }]},
+        options: CHART_OPTS
+      });
+
+      // ── Rolling Sharpe ───────────────────────────────────────────────
+      qlabChart('rollSharpeChart', {
+        type: 'line',
+        data: { labels: r.dates, datasets: [{
+          label: 'Rolling 60d Sharpe', data: r.sharpe,
+          borderColor: '#00ff88', borderWidth: 1.5, pointRadius: 0, tension: .3,
+          fill: { target:'origin', above:'rgba(0,255,136,.07)', below:'rgba(255,51,102,.07)' }
+        }, {
+          label: 'Sharpe = 1', data: Array(r.dates.length).fill(1),
+          borderColor:'rgba(255,255,255,.2)', borderDash:[4,4], borderWidth:1, pointRadius:0
+        }]},
+        options: CHART_OPTS
+      });
+
+      // ── Drawdown ─────────────────────────────────────────────────────
+      qlabChart('ddChart', {
+        type: 'line',
+        data: { labels: r.equity_dates, datasets: [{
+          label: 'Drawdown (%)', data: r.drawdown,
+          borderColor: '#ff3366', borderWidth: 1.5, pointRadius: 0, tension: .3,
+          fill: { target:'origin', below:'rgba(255,51,102,.12)' }
+        }]},
+        options: CHART_OPTS
+      });
+
+      // ── Monte Carlo Fan ──────────────────────────────────────────────
+      const mc = d.monte_carlo;
+      document.getElementById('mcProbProfit').textContent = mc.prob_profit + '%';
+      document.getElementById('mcP5').textContent  = '$' + mc.final_p5.toLocaleString();
+      document.getElementById('mcP50').textContent = '$' + mc.final_p50.toLocaleString();
+      document.getElementById('mcP95').textContent = '$' + mc.final_p95.toLocaleString();
+      qlabChart('mcChart', {
+        type: 'line',
+        data: { labels: mc.days, datasets: [
+          { label:'P95', data:mc.p95, borderColor:'rgba(0,255,136,.7)',  borderWidth:1, pointRadius:0, tension:.3, fill:'+1', backgroundColor:'rgba(0,255,136,.08)' },
+          { label:'P75', data:mc.p75, borderColor:'rgba(0,255,224,.5)',  borderWidth:1, pointRadius:0, tension:.3, fill:'+1', backgroundColor:'rgba(0,255,224,.06)' },
+          { label:'P50 (Median)', data:mc.p50, borderColor:'#00ffe0', borderWidth:2.5, pointRadius:0, tension:.3, fill:false },
+          { label:'P25', data:mc.p25, borderColor:'rgba(0,170,255,.5)', borderWidth:1, pointRadius:0, tension:.3, fill:'+1', backgroundColor:'rgba(255,170,0,.06)' },
+          { label:'P5',  data:mc.p5,  borderColor:'rgba(255,51,102,.7)', borderWidth:1, pointRadius:0, tension:.3, fill:false },
+          { label:'Start ($10k)', data:Array(mc.days.length).fill(10000),
+            borderColor:'rgba(255,255,255,.25)', borderDash:[5,5], borderWidth:1, pointRadius:0, fill:false }
+        ]},
+        options: { ...CHART_OPTS, plugins: { ...CHART_OPTS.plugins, legend: { labels:{ color:'#8892a4', font:{size:9}, boxWidth:10 } } } }
+      });
+
+      // ── Regime Transition Matrix ─────────────────────────────────────
+      const tm = d.transition_matrix;
+      const REGIME_COLORS = ['#00ff88','#ffaa00','#888888','#00aaff','#ff3366','#ff6600'];
+      let tmHtml = '<table class="tm-table"><thead><tr><th></th>';
+      tm.labels.forEach((l, i) => {
+        tmHtml += `<th style="color:${REGIME_COLORS[i]};font-size:.58rem;">${l.split('/')[0]}</th>`;
+      });
+      tmHtml += '</tr></thead><tbody>';
+      tm.matrix.forEach((row, i) => {
+        tmHtml += `<tr><td class="tm-row-label" style="color:${REGIME_COLORS[i]};">${tm.labels[i].split('/')[0]}</td>`;
+        row.forEach(v => {
+          const alpha = Math.min(v * 2.5, 0.95);
+          const bg    = `rgba(0,255,224,${alpha})`;
+          const tc    = alpha > 0.5 ? '#080c10' : '#e2e8f0';
+          tmHtml += `<td style="background:${bg};color:${tc};">${(v*100).toFixed(0)}%</td>`;
+        });
+        tmHtml += '</tr>';
+      });
+      tmHtml += '</tbody></table>';
+      document.getElementById('tmContainer').innerHTML = tmHtml;
+
+      // ── Feature Importance ───────────────────────────────────────────
+      const fi = d.feature_importance;
+      const fiMax = Math.max(...fi.map(f => f.importance), 0.001);
+      const fiHtml = fi.map(f => {
+        const pct = Math.max(0, (f.importance / fiMax) * 100).toFixed(1);
+        return `<div class="fi-bar-row">
+          <div class="fi-bar-label">${f.feature}</div>
+          <div class="fi-bar-track"><div class="fi-bar-fill" style="width:${pct}%"></div></div>
+          <div class="fi-bar-pct">${(f.importance * 100).toFixed(1)}%</div>
+        </div>`;
+      }).join('');
+      document.getElementById('fiContainer').innerHTML = fiHtml;
+
+      // ── Walk-Forward Optimisation ────────────────────────────────────
+      const wf = d.walk_forward;
+      document.getElementById('wfMean').textContent = wf.sharpe_mean?.toFixed(3) ?? '—';
+      document.getElementById('wfStd').textContent  = wf.sharpe_std?.toFixed(3)  ?? '—';
+      const wfBody = document.getElementById('wfBody');
+      wfBody.innerHTML = (wf.folds || []).map(f => {
+        const c = f.best_sharpe >= 1 ? '#00ff88' : f.best_sharpe >= 0 ? '#ffaa00' : '#ff3366';
+        return `<tr>
+          <td>Fold ${f.fold}</td>
+          <td style="font-size:.72rem;">${f.test_start}<br>${f.test_end}</td>
+          <td style="color:${c};font-weight:700;">${f.best_sharpe?.toFixed(3) ?? '—'}</td>
+          <td>${f.bull_thresh} / ${f.neutral_thresh}</td>
+        </tr>`;
+      }).join('');
+
+      // ── Cross-Validation IC ──────────────────────────────────────────
+      const cv = d.cross_validation;
+      document.getElementById('cvMean').textContent = cv.ic_mean?.toFixed(4) ?? '—';
+      document.getElementById('cvStd').textContent  = cv.ic_std?.toFixed(4)  ?? '—';
+      qlabChart('cvChart', {
+        type: 'bar',
+        data: {
+          labels: cv.fold_ics.map((_, i) => `Fold ${i+1}`),
+          datasets: [{
+            label: 'IC per Fold',
+            data: cv.fold_ics,
+            backgroundColor: cv.fold_ics.map(v => v >= 0 ? 'rgba(0,255,136,.6)' : 'rgba(255,51,102,.6)'),
+            borderColor:     cv.fold_ics.map(v => v >= 0 ? '#00ff88' : '#ff3366'),
+            borderWidth: 1.5, borderRadius: 4
+          }]
+        },
+        options: { ...CHART_OPTS, plugins: { ...CHART_OPTS.plugins, legend:{ display:false } } }
+      });
+
+      // ── Regime Confidence ────────────────────────────────────────────
+      const conf = d.regime_confidence;
+      document.getElementById('confCurrent').textContent = (conf.current * 100).toFixed(1) + '%';
+      const RCOL = {'Trending Bull':'#00ff88','Overbought':'#ffaa00','Sideways':'#888888',
+                    'Recovery':'#00aaff','Bear':'#ff3366','High Vol':'#ff6600'};
+      const confHtml = Object.entries(conf.by_regime).map(([regime, c]) => {
+        const col = RCOL[regime] || '#00ffe0';
+        return `<div class="conf-bar-row">
+          <div class="conf-label" style="color:${col}">${regime.split('/')[0]}</div>
+          <div class="conf-track"><div class="conf-fill" style="width:${(c*100).toFixed(0)}%;background:${col}"></div></div>
+          <div class="conf-pct" style="color:${col}">${(c*100).toFixed(0)}%</div>
+        </div>`;
+      }).join('');
+      document.getElementById('confContainer').innerHTML = confHtml;
+    }
+
   </script>
+
 
 
 

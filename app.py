@@ -1805,6 +1805,43 @@ def _run_server():
         """GET /api/v3/rate-limiter — Per-client token bucket status."""
         return jsonify(rate_limiter.stats())
 
+    # ── Phase 5: Quantitative Research Platform ───────────────────────────────
+
+    @flask_app.route('/api/v5/quant', methods=['POST'])
+    @cross_origin()
+    def v5_quant_research():
+        """
+        POST /api/v5/quant — Full quantitative research report.
+
+        Body (JSON):
+            { "ticker": "AAPL", "start_date": "2020-01-01", "end_date": "2024-12-31" }
+
+        Returns all 17 Phase-5 metrics:
+            performance, ic, rolling, monte_carlo, transition_matrix,
+            feature_importance, regime_confidence, walk_forward, cross_validation
+
+        Benchmark for Alpha/Beta: SPY (S&P 500 ETF), fixed.
+        Monte Carlo: 1,000 paths × 252 days, runs synchronously.
+        """
+        body       = request.get_json(force=True, silent=True) or {}
+        ticker     = str(body.get('ticker',     'AAPL')).strip().upper()
+        start_date = str(body.get('start_date', '2020-01-01'))
+        end_date   = str(body.get('end_date',   datetime.date.today().isoformat()))
+
+        if not ticker:
+            return jsonify({'error': 'ticker is required'}), 400
+
+        try:
+            from ml.quant_analytics import compute_quant_research_report
+            report = compute_quant_research_report(ticker, start_date, end_date)
+            return jsonify(report)
+        except RuntimeError as exc:
+            log.warning(f"[v5/quant] {ticker}: {exc}")
+            return jsonify({'error': str(exc)}), 422
+        except Exception as exc:
+            log.exception(f"[v5/quant] Unexpected error for {ticker}: {exc}")
+            return jsonify({'error': f'Internal error: {exc}'}), 500
+
     @flask_app.route('/metrics', methods=['GET'])
     def prometheus_scrape():
         """
@@ -1819,5 +1856,5 @@ def _run_server():
         return Response(REGISTRY.format_prometheus(),
                         mimetype="text/plain; version=0.0.4")
 
-    log.info("All API routes registered (v1, v2, v3 + /metrics). Starting Flask server...")
+    log.info("All API routes registered (v1, v2, v3, v5 + /metrics). Starting Flask server...")
     flask_app.run(host=CFG.host, port=CFG.port, debug=CFG.debug)
