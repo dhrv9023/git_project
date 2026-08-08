@@ -919,6 +919,7 @@
       <li><a href="#regime">Regime Engine <span class="kbd-shortcut">⌘K</span></a></li>
       <li><a href="#predict">Deep Learning</a></li>
       <li><a href="#quant-lab" style="color:var(--cyan);">⚗️ Quant Lab</a></li>
+      <li><a href="#ai-platform" style="color:#00ffe0;font-weight:700;">🤖 AI Intelligence</a></li>
       <li><a href="#telemetry">System Health</a></li>
 
       <li><a href="#how-it-works">How It Works</a></li>
@@ -1674,7 +1675,129 @@ Top Matches Identified:
         </div>
       </div>
     </div>
+  <!-- PHASE 7: AI FINANCIAL INTELLIGENCE PLATFORM -->
+  <section class="quant-lab-section" id="ai-platform" style="background:var(--bg);">
+    <div class="section-label" style="color:var(--cyan);">Phase 7 Feature</div>
+    <h2 class="section-title">🤖 AI Financial Intelligence Command Center</h2>
+    <p class="section-sub">LLM Market Summaries, Explainable AI (XAI) Feature Attributions, Markowitz Efficient Frontier Optimization, Sector Heatmaps, News Sentiment & Macro Economic Calendar.</p>
+
+    <!-- AI COMMAND CONSOLE -->
+    <div class="qlab-console">
+      <div class="field-group">
+        <label for="aiTicker">Primary Ticker</label>
+        <input type="text" id="aiTicker" value="AAPL" placeholder="AAPL" style="width:100px;">
+      </div>
+      <div class="field-group">
+        <label for="aiAssetList">Portfolio Assets (Comma Separated)</label>
+        <input type="text" id="aiAssetList" value="AAPL, MSFT, GOOGL, SPY" style="width:240px;">
+      </div>
+      <div class="field-group">
+        <label for="aiRfRate">Annual Risk-Free Rate (%)</label>
+        <input type="number" id="aiRfRate" value="5.0" step="0.5" style="width:90px;">
+      </div>
+      <button id="runAiBtn" class="qlab-run-btn" onclick="runAiIntelligence()">
+        ⚡ Run AI Intelligence & Portfolio Engine
+      </button>
+    </div>
+
+    <!-- AI INTELLIGENCE DASHBOARD -->
+    <div id="aiDashboard" style="margin-top:2rem;">
+      <!-- ROW 1: LLM MARKET BRIEF & XAI ATTRIBUTION -->
+      <div class="qlab-charts-2col">
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">
+            <span>🧠 LLM Market Executive Brief</span>
+            <span class="inspector-badge" id="aiSentimentBadge" style="background:rgba(0,255,224,0.1);color:var(--cyan);">BULLISH</span>
+          </div>
+          <h3 id="aiHeadline" style="font-size:1.1rem;color:var(--text);margin-bottom:.8rem;font-weight:700;">
+            AI Intelligence Brief: Loading natural language synthesis...
+          </h3>
+          <p id="aiSummary" style="font-size:.9rem;color:var(--muted);line-height:1.6;margin-bottom:1.2rem;">
+            Execute AI Intelligence analysis to generate real-time natural language market commentary.
+          </p>
+          <h4 style="font-size:.82rem;color:var(--cyan);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.6rem;">Key Drivers & Recommendations</h4>
+          <ul id="aiTakeaways" style="padding-left:1.2rem;color:var(--text);font-size:.88rem;line-height:1.7;">
+            <li>Market Regime & Win-Rate probability evaluation</li>
+            <li>Technical RSI & Volatility risk assessment</li>
+            <li>Tactical trailing stop allocation recommendation</li>
+          </ul>
+        </div>
+
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">
+            <span>🔍 Explainable AI (XAI) Feature Attribution</span>
+            <span style="font-size:.75rem;color:var(--muted);">SHAP Relative Contribution</span>
+          </div>
+          <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem;">
+            Relative impact of technical indicators and regime vectors pushing predictions up or down.
+          </p>
+          <canvas id="xaiChart" height="210"></canvas>
+        </div>
+      </div>
+
+      <!-- ROW 2: MARKOWITZ EFFICIENT FRONTIER & PORTFOLIO ALLOCATION -->
+      <div class="qlab-charts-2col" style="margin-top:1.8rem;">
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">
+            <span>📈 Markowitz Efficient Frontier</span>
+            <span style="font-size:.75rem;color:var(--cyan);">Tangency vs Min Volatility</span>
+          </div>
+          <canvas id="frontierChart" height="220"></canvas>
+        </div>
+
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">
+            <span>⚖️ Optimal Portfolio Allocations</span>
+            <span style="font-size:.75rem;color:var(--muted);">Max Sharpe Ratio</span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;font-size:.85rem;margin-top:.5rem;">
+              <thead>
+                <tr>
+                  <th>Asset</th>
+                  <th>Max Sharpe Weight</th>
+                  <th>Min Vol Weight</th>
+                  <th>Equal Weight</th>
+                </tr>
+              </thead>
+              <tbody id="optAllocTable">
+                <tr><td colspan="4" style="text-align:center;color:var(--muted);">Run Optimization to view weights</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="optMetricsSummary" style="margin-top:1.2rem;display:flex;gap:1.5rem;font-size:.84rem;color:var(--text);flex-wrap:wrap;">
+            <div>Expected Return: <strong id="optReturn" style="color:var(--cyan);">—</strong></div>
+            <div>Vol (Risk): <strong id="optVol" style="color:#ff5f56;">—</strong></div>
+            <div>Sharpe Ratio: <strong id="optSharpe" style="color:var(--green);">—</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 3: SECTOR HEATMAP & MACRO ECONOMIC CALENDAR -->
+      <div class="qlab-charts-2col" style="margin-top:1.8rem;">
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">
+            <span>🔥 Sector Performance & Sentiment Heatmap</span>
+            <span style="font-size:.75rem;color:var(--muted);">6 Major Sectors</span>
+          </div>
+          <div id="sectorGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-top:1rem;">
+            <!-- Sector tiles injected via JS -->
+          </div>
+        </div>
+
+        <div class="qlab-panel">
+          <div class="qlab-panel-title">
+            <span>📅 Macro Economic Calendar</span>
+            <span style="font-size:.75rem;color:var(--muted);">FOMC & Inflation Events</span>
+          </div>
+          <div id="macroCalendar" style="display:flex;flex-direction:column;gap:.8rem;margin-top:1rem;">
+            <!-- Calendar items injected via JS -->
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
+
 
 
   <!-- HOW IT WORKS (HORIZONTAL EXECUTION CIRCUIT) -->
@@ -2962,6 +3085,221 @@ Top Matches Identified:
       }).join('');
       document.getElementById('confContainer').innerHTML = confHtml;
     }
+
+
+    // ── Phase 7: AI Intelligence & Portfolio Engine Handler ───────────────
+    let xaiChartObj = null;
+    let frontierChartObj = null;
+
+    async function runAiIntelligence() {
+      const tickerInput = document.getElementById('aiTicker');
+      const assetInput = document.getElementById('aiAssetList');
+      const rfInput = document.getElementById('aiRfRate');
+      const btn = document.getElementById('runAiBtn');
+
+      const ticker = (tickerInput ? tickerInput.value : 'AAPL').toUpperCase().trim();
+      const assetsRaw = assetInput ? assetInput.value : 'AAPL, MSFT, GOOGL, SPY';
+      const rfRate = parseFloat(rfInput ? rfInput.value : 5.0) / 100.0;
+
+      if (btn) { btn.disabled = true; btn.innerHTML = '⌛ Computing AI Intelligence...'; }
+
+      try {
+        // 1. Fetch LLM Executive Brief & XAI Attribution
+        const expRes = await fetch('/api/v7/ai/explain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticker: ticker, regime: 'Momentum Breakout', signal: 'UP', confidence: 0.76 })
+        });
+        const expData = await expRes.json();
+
+        // Update Brief UI
+        const headElem = document.getElementById('aiHeadline');
+        const sumElem = document.getElementById('aiSummary');
+        const badgeElem = document.getElementById('aiSentimentBadge');
+        const takeElem = document.getElementById('aiTakeaways');
+
+        if (headElem) headElem.textContent = expData.headline || `AI Brief for ${ticker}`;
+        if (sumElem) sumElem.textContent = expData.executive_summary || 'Analysis complete.';
+        if (badgeElem) badgeElem.textContent = (expData.sentiment_bias || 'BULLISH').toUpperCase();
+        if (takeElem && expData.key_takeaways) {
+          takeElem.innerHTML = expData.key_takeaways.map(t => `<li>${t}</li>`).join('');
+        }
+
+        // Render XAI Attribution Waterfall Chart
+        renderXaiChart(expData.feature_attributions || []);
+
+        // 2. Fetch Markowitz Portfolio Optimization
+        const optRes = await fetch('/api/v7/portfolio/optimize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tickers: assetsRaw, risk_free_rate: rfRate })
+        });
+        const optData = await optRes.json();
+
+        renderFrontierChart(optData.efficient_frontier || [], optData.max_sharpe_portfolio, optData.min_volatility_portfolio);
+        renderAllocTable(optData);
+
+        // 3. Fetch Sector Heatmap & Macro Calendar
+        const intelRes = await fetch(`/api/v7/market/intelligence?ticker=${ticker}`);
+        const intelData = await intelRes.json();
+
+        renderSectorHeatmap(intelData.sector_heatmap || []);
+        renderMacroCalendar(intelData.economic_calendar || []);
+
+        if (typeof showToast === 'function') showToast(`AI Intelligence & Portfolio Optimization completed for ${ticker}`, 'success');
+
+      } catch (err) {
+        console.error('AI Intelligence Error:', err);
+        if (typeof showToast === 'function') showToast('Failed to run AI Intelligence: ' + err.message, 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '⚡ Run AI Intelligence & Portfolio Engine'; }
+      }
+    }
+
+    function renderXaiChart(attributions) {
+      const ctx = document.getElementById('xaiChart');
+      if (!ctx) return;
+      if (xaiChartObj) xaiChartObj.destroy();
+
+      const labels = attributions.map(a => a.feature);
+      const values = attributions.map(a => a.weight);
+      const bgColors = values.map(v => v >= 0 ? 'rgba(0, 255, 224, 0.7)' : 'rgba(255, 95, 86, 0.7)');
+
+      xaiChartObj = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Relative Impact Weight',
+            data: values,
+            backgroundColor: bgColors,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8892a4' } },
+            y: { grid: { display: false }, ticks: { color: '#e2e8f0' } }
+          }
+        }
+      });
+    }
+
+    function renderFrontierChart(frontier, maxSharpe, minVol) {
+      const ctx = document.getElementById('frontierChart');
+      if (!ctx) return;
+      if (frontierChartObj) frontierChartObj.destroy();
+
+      const frontierData = frontier.map(p => ({ x: p.volatility * 100, y: p.return * 100 }));
+      const maxSharpePoint = maxSharpe ? [{ x: maxSharpe.volatility * 100, y: maxSharpe.expected_return * 100 }] : [];
+      const minVolPoint = minVol ? [{ x: minVol.volatility * 100, y: minVol.expected_return * 100 }] : [];
+
+      frontierChartObj = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+          datasets: [
+            {
+              label: 'Efficient Frontier',
+              data: frontierData,
+              backgroundColor: 'rgba(0, 255, 224, 0.4)',
+              pointRadius: 4
+            },
+            {
+              label: 'Max Sharpe (Tangency)',
+              data: maxSharpePoint,
+              backgroundColor: '#00ff88',
+              pointRadius: 8,
+              pointHoverRadius: 10
+            },
+            {
+              label: 'Minimum Volatility',
+              data: minVolPoint,
+              backgroundColor: '#00aaff',
+              pointRadius: 8,
+              pointHoverRadius: 10
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { labels: { color: '#e2e8f0' } } },
+          scales: {
+            x: { title: { display: true, text: 'Annualized Volatility (%)', color: '#8892a4' }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8892a4' } },
+            y: { title: { display: true, text: 'Expected Return (%)', color: '#8892a4' }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8892a4' } }
+          }
+        }
+      });
+    }
+
+    function renderAllocTable(optData) {
+      const tbody = document.getElementById('optAllocTable');
+      if (!tbody) return;
+
+      const tickers = optData.tickers || [];
+      const maxW = optData.max_sharpe_portfolio ? optData.max_sharpe_portfolio.weights : {};
+      const minW = optData.min_volatility_portfolio ? optData.min_volatility_portfolio.weights : {};
+      const eqW = optData.equal_weight ? optData.equal_weight.weights : {};
+
+      tbody.innerHTML = tickers.map(t => `
+        <tr>
+          <td><strong style="color:var(--text);">${t}</strong></td>
+          <td style="color:var(--cyan);font-weight:700;">${((maxW[t] || 0) * 100).toFixed(1)}%</td>
+          <td style="color:#00aaff;">${((minW[t] || 0) * 100).toFixed(1)}%</td>
+          <td style="color:var(--muted);">${((eqW[t] || 0) * 100).toFixed(1)}%</td>
+        </tr>
+      `).join('');
+
+      if (optData.max_sharpe_portfolio) {
+        const retElem = document.getElementById('optReturn');
+        const volElem = document.getElementById('optVol');
+        const shElem = document.getElementById('optSharpe');
+
+        if (retElem) retElem.textContent = (optData.max_sharpe_portfolio.expected_return * 100).toFixed(1) + '%';
+        if (volElem) volElem.textContent = (optData.max_sharpe_portfolio.volatility * 100).toFixed(1) + '%';
+        if (shElem) shElem.textContent = optData.max_sharpe_portfolio.sharpe_ratio.toFixed(2);
+      }
+    }
+
+    function renderSectorHeatmap(sectors) {
+      const grid = document.getElementById('sectorGrid');
+      if (!grid) return;
+
+      grid.innerHTML = sectors.map(s => {
+        const color = s.change_pct >= 0 ? 'var(--green)' : '#ff5f56';
+        return `
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:.8rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:.78rem;font-weight:700;color:var(--text);">${s.sector}</span>
+              <span style="font-size:.82rem;font-weight:800;color:${color};font-family:'JetBrains Mono',monospace;">${s.change_pct > 0 ? '+' : ''}${s.change_pct.toFixed(2)}%</span>
+            </div>
+            <div style="font-size:.7rem;color:var(--muted);margin-top:.3rem;">${s.regime}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderMacroCalendar(events) {
+      const container = document.getElementById('macroCalendar');
+      if (!container) return;
+
+      container.innerHTML = events.map(e => `
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:.8rem;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:var(--text);">${e.event}</div>
+            <div style="font-size:.74rem;color:var(--muted);">${e.date} • Consensus: ${e.consensus}</div>
+          </div>
+          <span class="inspector-badge" style="background:rgba(255,95,86,0.15);color:#ff5f56;font-weight:800;">${e.impact}</span>
+        </div>
+      `).join('');
+    }
+
+    // Auto-run AI Intelligence on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => { runAiIntelligence(); }, 800);
+    });
 
   </script>
 

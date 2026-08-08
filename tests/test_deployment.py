@@ -3,12 +3,11 @@ tests/test_deployment.py — Unit tests for Phase 6 Deployment features.
 Tests container health probes, readiness probes, security headers, and config defaults.
 """
 
-import sys
 import unittest
 
 # Import app modules
-from core.config import AppConfig, CFG
-from app import flask_app, _run_server
+from core.config import AppConfig
+from app import flask_app
 
 
 class TestDeploymentFeatures(unittest.TestCase):
