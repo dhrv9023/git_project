@@ -41,4 +41,10 @@ def register_observability(app: Flask, rate_limiter) -> None:
             endpoint=endpoint,
             status=str(response.status_code),
         )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        if "Content-Security-Policy" not in response.headers:
+            response.headers["Content-Security-Policy"] = "default-src 'self'"
         return response

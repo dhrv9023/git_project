@@ -15,7 +15,7 @@ from unittest.mock import patch, MagicMock
 from tests.conftest import make_synthetic_ohlcv
 
 
-def _mock_fetch(ticker, start, end):
+def _mock_fetch(*args, **kwargs):
     """Return synthetic OHLCV without network."""
     return make_synthetic_ohlcv(300)
 

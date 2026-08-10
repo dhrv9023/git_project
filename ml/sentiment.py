@@ -111,7 +111,7 @@ class SentimentScorer:
 
     def score(self, text: str) -> SentimentScore:
         """Score a single text string."""
-        if not self._available or not text.strip():
+        if not self._available or self._vader is None or not text.strip():
             return SentimentScore(0.0, 0.0, 0.0, 1.0, "Neutral", 0.0)
 
         scores = self._vader.polarity_scores(text)

@@ -29,8 +29,6 @@ from app.auth.auth_service import AuthService
 
 log = logging.getLogger(__name__)
 
-auth_bp = Blueprint("auth", __name__, url_prefix="/api/v7/auth")
-
 
 def init_jwt(app) -> JWTManager:
     """Configure Flask-JWT-Extended on the Flask app.
@@ -58,8 +56,9 @@ def init_jwt(app) -> JWTManager:
 
 def make_auth_blueprint(auth_svc: AuthService) -> Blueprint:
     """Factory that returns the auth blueprint with injected AuthService."""
+    bp = Blueprint("auth", __name__, url_prefix="/api/v7/auth")
 
-    @auth_bp.route("/register", methods=["POST"])
+    @bp.route("/register", methods=["POST"])
     def register():
         """POST /api/v7/auth/register — Create a new user account.
 
@@ -91,7 +90,7 @@ def make_auth_blueprint(auth_svc: AuthService) -> Blueprint:
             "refresh_token": refresh_token,
         }), 201
 
-    @auth_bp.route("/login", methods=["POST"])
+    @bp.route("/login", methods=["POST"])
     def login():
         """POST /api/v7/auth/login — Authenticate and receive JWT tokens.
 
@@ -122,7 +121,7 @@ def make_auth_blueprint(auth_svc: AuthService) -> Blueprint:
             "user": user,
         }), 200
 
-    @auth_bp.route("/refresh", methods=["POST"])
+    @bp.route("/refresh", methods=["POST"])
     @jwt_required(refresh=True)
     def refresh():
         """POST /api/v7/auth/refresh — Get new access token using refresh token.
@@ -137,7 +136,7 @@ def make_auth_blueprint(auth_svc: AuthService) -> Blueprint:
             "expires_in": 86400,
         }), 200
 
-    @auth_bp.route("/me", methods=["GET"])
+    @bp.route("/me", methods=["GET"])
     @jwt_required()
     def me():
         """GET /api/v7/auth/me — Get current user profile (requires token)."""
@@ -147,7 +146,7 @@ def make_auth_blueprint(auth_svc: AuthService) -> Blueprint:
             return jsonify({"error": "User not found"}), 404
         return jsonify({"user": user}), 200
 
-    @auth_bp.route("/logout", methods=["POST"])
+    @bp.route("/logout", methods=["POST"])
     @jwt_required()
     def logout():
         """POST /api/v7/auth/logout — Client-side logout (stateless).
@@ -163,4 +162,4 @@ def make_auth_blueprint(auth_svc: AuthService) -> Blueprint:
             "note": "Stateless JWT — token remains valid until expiry unless blocklist is enabled."
         }), 200
 
-    return auth_bp
+    return bp

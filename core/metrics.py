@@ -254,9 +254,10 @@ class MetricsRegistry:
                         for q, p in [("0.5", "p50"), ("0.95", "p95"), ("0.99", "p99")]:
                             v = snap.get(p)
                             if v is not None:
-                                ql = label_str.rstrip("}") + f',quantile="{q}"' + "}"
-                                if ql.startswith("}"):
-                                    ql = '{' + ql[1:]
+                                if label_str:
+                                    ql = label_str.rstrip("}") + f',quantile="{q}"}}'
+                                else:
+                                    ql = f'{{quantile="{q}"}}'
                                 lines.append(f"{name}{ql} {v}")
         return "\n".join(lines) + "\n"
 

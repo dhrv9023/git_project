@@ -26,7 +26,7 @@ def liveness():
         "status": "healthy",
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "uptime_seconds": round(time.time() - _START_TIME, 2),
-        "version": "2.0.0",
+        "version": "6.0.0",
     }), 200
 
 
