@@ -1,0 +1,85 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "stockbuddy"
+version = "2.0.0"
+description = "Quantitative Market Intelligence Engine"
+requires-python = ">=3.10"
+
+# ---------------------------------------------------------------------------
+# Ruff — fast Python linter (replaces flake8 + isort + pyflakes)
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults (Flask routes)
+    "N803",  # argument name should be lowercase (ML convention uses X)
+    "N806",  # variable in function should be lowercase (ML convention)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["N802", "S101"]  # allow assert statements in tests
+
+# ---------------------------------------------------------------------------
+# Black — code formatter
+# ---------------------------------------------------------------------------
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+# ---------------------------------------------------------------------------
+# Mypy — static type checker
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true  # many ML libs lack stubs
+disallow_untyped_defs = false  # relax for gradual adoption
+
+[[tool.mypy.overrides]]
+module = ["tensorflow.*", "keras.*", "sklearn.*", "yfinance.*", "scipy.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+markers = [
+    "unit: fast, no I/O (deselect with '-m not unit')",
+    "integration: uses Flask test client",
+    "slow: trains actual models",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+
+# ---------------------------------------------------------------------------
+# Coverage
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["app", "ml", "core", "storage"]
+omit = ["*/tests/*", "*/__pycache__/*", "*/migrations/*"]
+
+[tool.coverage.report]
+fail_under = 60
+show_missing = true
+skip_covered = false

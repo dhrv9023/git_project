@@ -151,46 +151,87 @@ class BackgroundTrainer:
     def _run_job(self, job: TrainingJob):
         """
         Actual training logic — runs inside a worker thread.
-        Imports are deferred to avoid circular imports with app.py.
-        """
-        # Late import: app.py functions are not importable at module level
-        # because app.py isn't a package. We import the training functions
-        # from the same process's global scope via sys.modules trick.
-        import sys
 
+        Engineering decision: direct imports from ml.features and ml.models
+        replace the previous sys.modules hack. This makes the trainer
+        independently importable and fully testable without a running Flask app.
+        """
         # Mark running
         with self._lock:
-            job.status     = "running"
+            job.status = "running"
             job.started_at = datetime.datetime.utcnow().isoformat()
         self.registry.update_status(job.ticker, job.version, "training")
         log.info(f"[{job.job_id}] Training started: {job.ticker}/{job.version}")
 
         try:
-            # Pull training functions from app module (already imported by Flask)
-            app_mod = sys.modules.get("__main__") or sys.modules.get("app")
-
-            prepare_data       = app_mod.prepare_data
-            split_and_scale    = app_mod.split_and_scale_data
-            train_models_fn    = app_mod.train_models
-            evaluate_ensemble  = app_mod.evaluate_and_ensemble
+            # Direct imports — no sys.modules coupling
+            from app.repositories.market_data_repo import MarketDataRepository
+            from ml.features import split_and_scale_data
+            from ml.models import build_model, make_callbacks
+            from app.services.backtest_service import BacktestService
+            import numpy as np
 
             cfg = self.cfg
+            market_repo = MarketDataRepository()
 
-            # ── Data pipeline (Phase 1 corrected) ─────────────────────────
-            data = prepare_data(job.ticker, job.start_date, job.end_date, job.seq_len)
-            splits = split_and_scale(
+            # ── Data pipeline ──────────────────────────────────────────────
+            data = market_repo.build_feature_matrix(
+                job.ticker, job.start_date, job.end_date, job.seq_len
+            )
+            splits = split_and_scale_data(
                 data["X_raw"], data["y_raw"], data["dates_raw"], data["base_prices_raw"],
                 cfg.train_split, cfg.val_split, job.seq_len,
             )
             input_shape = (job.seq_len, data["X_raw"].shape[1])
 
             # ── Train ──────────────────────────────────────────────────────
-            selected = [m for m in job.models if m in {"LSTM", "GRU", "Transformer"}] or None
-            models_dict = train_models_fn(splits, input_shape, job.epochs, job.batch_size,
-                                          selected_models=selected, use_early_stopping=True)
+            selected = [m for m in job.models if m in {"LSTM", "GRU", "Transformer"}]
+            if not selected:
+                selected = ["LSTM", "GRU", "Transformer"]
 
-            # ── Evaluate ───────────────────────────────────────────────────
-            eval_results = evaluate_ensemble(models_dict, splits, splits["scaler_y"])
+            X_train, y_train, _, _ = splits["train"]
+            X_val, y_val, _, _ = splits["val"]
+            steps_per_epoch = max(1, len(X_train) // job.batch_size)
+
+            models_dict = {}
+            for model_type in selected:
+                log.info(f"[{job.job_id}] Training {model_type}...")
+                model = build_model(model_type, input_shape, cfg.learning_rate)
+                cbs = make_callbacks(job.epochs, steps_per_epoch, cfg.learning_rate)
+                history = model.fit(
+                    X_train, y_train,
+                    validation_data=(X_val, y_val),
+                    epochs=job.epochs,
+                    batch_size=job.batch_size,
+                    verbose=0,
+                    callbacks=cbs,
+                )
+                models_dict[model_type] = model
+                models_dict[f"{model_type}_history"] = history.history
+
+            # ── Evaluate (ensemble) ────────────────────────────────────────
+            scaler_y = splits["scaler_y"]
+            X_test, y_test, dates_test, base_test = splits["test"]
+            model_names = [k for k in models_dict if not k.endswith("_history")]
+            preds = {}
+            bt_svc = BacktestService(cfg)
+            for name in model_names:
+                y_pred_scaled = models_dict[name].predict(X_test, verbose=0).ravel()
+                logret_pred = scaler_y.inverse_transform(y_pred_scaled.reshape(-1, 1)).ravel()
+                logret_true = scaler_y.inverse_transform(y_test.reshape(-1, 1)).ravel()
+                price_pred = base_test * np.exp(logret_pred)
+                preds[name] = price_pred
+
+            y_true_prices = base_test * np.exp(logret_true)
+            y_stack = np.stack([preds[n] for n in model_names], axis=1)
+            y_ens = y_stack.mean(axis=1)
+            preds["Ensemble"] = y_ens
+
+            metrics = {
+                name: bt_svc.calculate_metrics(y_true_prices, preds[name])
+                for name in list(model_names) + ["Ensemble"]
+            }
+            eval_results = {"metrics": metrics}
 
             # Build clean metrics dict (JSON-serializable)
             import math

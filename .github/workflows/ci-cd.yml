@@ -1,102 +1,167 @@
-name: StockBuddy CI/CD Pipeline
+name: StockBuddy CI/CD Pipeline v2
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master, develop]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
 
 jobs:
-  lint-and-test:
-    name: 🧪 Lint & Test
+  # ─────────────────────────────────────────────────────────────────
+  # Job 1: Lint & Format check
+  # ─────────────────────────────────────────────────────────────────
+  lint-and-format:
+    name: 🔍 Lint & Format
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-          cache: 'pip'
+          python-version: "3.10"
+          cache: pip
 
-      - name: Install Dependencies
+      - name: Install dev dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
 
-      - name: Code Quality & Static Analysis
-        run: |
-          python -m pyflakes app.py ml/ core/
+      - name: Ruff lint
+        run: ruff check app/ ml/ core/ storage/ tests/
 
-      - name: Run Unit Tests
-        run: |
-          pytest tests/ -v --tb=short
+      - name: Ruff format check
+        run: ruff format --check app/ ml/ core/ storage/ tests/
 
-  docker-build-and-healthcheck:
-    name: 🐳 Docker Build & Health Probe Verification
+  # ─────────────────────────────────────────────────────────────────
+  # Job 2: Type check
+  # ─────────────────────────────────────────────────────────────────
+  type-check:
+    name: 🔎 Type Check (mypy)
     runs-on: ubuntu-latest
-    needs: lint-and-test
-
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: actions/setup-docker-action@v3
-        ignore: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
 
-      - name: Build Docker Image
+      - name: Install dependencies
         run: |
-          docker build -t stockbuddy:ci .
+          pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Test Container Execution & Health Check
+      - name: mypy
+        run: mypy app/ core/ --ignore-missing-imports
+        continue-on-error: true  # non-blocking until type coverage improves
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 3: Unit tests
+  # ─────────────────────────────────────────────────────────────────
+  unit-tests:
+    name: 🧪 Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
         run: |
-          docker run -d --name stockbuddy_test -p 5000:5000 -e ENVIRONMENT=staging stockbuddy:ci
-          echo "Waiting for container initialization..."
-          sleep 5
+          pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
 
-          # Retry curl up to 6 times
-          for i in {1..6}; do
+      - name: Run unit tests with coverage
+        run: |
+          pytest tests/unit/ -v --tb=short \
+            --cov=app --cov=ml --cov=core --cov=storage \
+            --cov-report=term-missing \
+            --cov-fail-under=60
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 4: Integration tests
+  # ─────────────────────────────────────────────────────────────────
+  integration-tests:
+    name: 🔗 Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run integration tests
+        run: pytest tests/integration/ -v --tb=short
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 5: Docker build & health check
+  # ─────────────────────────────────────────────────────────────────
+  docker-build:
+    name: 🐳 Docker Build & Health Probe
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t stockbuddy:ci .
+
+      - name: Run container and health check
+        run: |
+          docker run -d --name sb_test -p 5000:5000 \
+            -e ENVIRONMENT=staging \
+            -e SB_EPOCHS=2 \
+            stockbuddy:ci
+
+          echo "Waiting for startup..."
+          for i in {1..10}; do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health || echo "000")
             if [ "$STATUS" = "200" ]; then
-              echo "✓ Container /health probe passed (HTTP 200)"
+              echo "✓ /health returned HTTP 200"
               break
             fi
-            echo "Attempt $i: HTTP $STATUS, retrying in 3s..."
-            sleep 3
+            echo "Attempt $i: HTTP $STATUS — retrying in 5s..."
+            sleep 5
           done
 
-          # Verify /ready probe
-          READY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/ready || echo "000")
-          echo "Container /ready probe response HTTP $READY_STATUS"
-          if [ "$READY_STATUS" != "200" ]; then
-            docker logs stockbuddy_test
+          READY=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/ready || echo "000")
+          echo "/ready returned HTTP $READY"
+          if [ "$READY" != "200" ]; then
+            docker logs sb_test
             exit 1
           fi
 
-      - name: Stop & Cleanup Test Container
+      - name: Cleanup
         if: always()
-        run: |
-          docker stop stockbuddy_test || true
-          docker rm stockbuddy_test || true
+        run: docker stop sb_test && docker rm sb_test || true
 
+  # ─────────────────────────────────────────────────────────────────
+  # Job 6: Deploy (main branch only)
+  # ─────────────────────────────────────────────────────────────────
   deploy:
-    name: 🚀 Automated Cloud Deployment
+    name: 🚀 Deploy to Render
     runs-on: ubuntu-latest
-    needs: docker-build-and-healthcheck
+    needs: [lint-and-format, unit-tests, docker-build]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
     steps:
       - name: Trigger Render Deploy Webhook
         env:
           RENDER_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
           if [ -n "$RENDER_HOOK" ]; then
-            echo "Triggering Render continuous deployment hook..."
             curl -s -X POST "$RENDER_HOOK"
-            echo "✓ Render deploy triggered successfully."
+            echo "✓ Render deploy triggered"
           else
-            echo "ℹ RENDER_DEPLOY_HOOK_URL secret not set. Skipping automated webhook."
+            echo "ℹ RENDER_DEPLOY_HOOK_URL not set — skipping"
           fi
