@@ -85,12 +85,12 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     out = df.copy()
     out["Return"] = out["Close"].pct_change()
-    out["LogReturn"] = np.log(out["Close"]).diff()
+    out["LogReturn"] = out["Close"].apply(np.log).diff()
     out["RSI14"] = compute_rsi(out["Close"], 14)
     out["EMA20"] = compute_ema(out["Close"], 20)
     macd_df = compute_macd(out["Close"])
     out = pd.concat([out, macd_df], axis=1)
-    out["DayOfWeek"] = out.index.dayofweek
+    out["DayOfWeek"] = pd.DatetimeIndex(out.index).dayofweek
     return out.dropna()
 
 
