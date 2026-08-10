@@ -20,6 +20,13 @@ tensorflow>=2.15.0
 prometheus-client>=0.19.0
 sentry-sdk[flask]>=1.40.0
 
+# Authentication
+flask-jwt-extended>=4.7.0
+bcrypt>=5.0.0
+
+# NLP / Sentiment Analysis
+vaderSentiment>=3.3.2
+
 # HTTP & Utilities
 requests>=2.31.0
 

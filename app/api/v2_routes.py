@@ -13,7 +13,7 @@ from core.config import AppConfig
 log = logging.getLogger(__name__)
 
 
-def make_v2_blueprint(training_svc, engine, cache, store, scheduler, cfg: AppConfig) -> Blueprint:
+def make_v2_blueprint(training_svc, engine, cache, store, scheduler, comparison_svc, cfg: AppConfig) -> Blueprint:
     bp = Blueprint("v2", __name__, url_prefix="/api/v2")
 
     @bp.route("/train", methods=["POST"])
@@ -105,6 +105,45 @@ def make_v2_blueprint(training_svc, engine, cache, store, scheduler, cfg: AppCon
                 "disk_mb": round(store.disk_usage_bytes() / 1024 ** 2, 2),
             },
             "scheduler": scheduler.status(),
+        }), 200
+
+    @bp.route("/compare", methods=["POST"])
+    def v2_compare():
+        """POST /api/v2/compare — Multi-stock comparison.
+
+        Body:
+          tickers    list[str]  required  up to 10 ticker symbols
+          start_date str        optional  ISO date (default 2 years ago)
+          end_date   str        optional  ISO date (default today)
+
+        Returns normalised prices, daily returns, correlation matrix, summary stats.
+        """
+        payload = request.get_json(force=True) or {}
+        tickers = payload.get("tickers", ["AAPL", "MSFT", "GOOGL"])
+        if isinstance(tickers, str):
+            tickers = [t.strip() for t in tickers.split(",") if t.strip()]
+        two_years_ago = (datetime.date.today() - datetime.timedelta(days=730)).isoformat()
+        start = payload.get("start_date", two_years_ago)
+        end = payload.get("end_date", datetime.date.today().isoformat())
+
+        result = comparison_svc.compare(tickers, start, end)
+        return jsonify(result), 200
+
+    @bp.route("/risk/<ticker>", methods=["GET"])
+    def v2_risk(ticker: str):
+        """GET /api/v2/risk/{ticker} — Standalone risk score endpoint."""
+        from app.repositories.market_data_repo import MarketDataRepository
+        from app.services.regime_service import RegimeService
+        three_years_ago = (datetime.date.today() - datetime.timedelta(days=3 * 365)).isoformat()
+        end = datetime.date.today().isoformat()
+        regime_svc = RegimeService(MarketDataRepository(), cfg)
+        result = regime_svc.classify(ticker.upper(), three_years_ago, end)
+        return jsonify({
+            "ticker": ticker.upper(),
+            "risk_score": result.risk_score,
+            "alert": result.alert,
+            "current_regime": result.current_regime,
+            "indicators": result.indicators,
         }), 200
 
     return bp

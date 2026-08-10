@@ -17,6 +17,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 import time
 import datetime
 
@@ -31,9 +32,12 @@ from ml.trainer import BackgroundTrainer
 from ml.inference import InferenceCache, InferenceEngine
 from ml.scheduler import RetrainingScheduler
 from storage.model_store import ModelStore
+from storage.workspace_store import WorkspaceStore
 
+from app.auth.auth_service import AuthService
 from app.repositories.market_data_repo import MarketDataRepository
 from app.services.backtest_service import BacktestService
+from app.services.comparison_service import ComparisonService
 from app.services.regime_service import RegimeService
 from app.services.training_service import TrainingService
 from app.middleware.error_handlers import register_error_handlers
@@ -82,10 +86,23 @@ def create_app(cfg: AppConfig | None = None) -> Flask:
     regime_svc = RegimeService(market_repo, cfg)
     backtest_svc = BacktestService(cfg)
     training_svc = TrainingService(registry, raw_trainer, cfg)
+    comparison_svc = ComparisonService(market_repo, cfg)
 
-    # ── Flask application ─────────────────────────────────────────────────
+    # ── Persistent user data store ───────────────────────────────────
+    workspace_store = WorkspaceStore(
+        base_dir=os.path.join(cfg.model_artifacts_dir, "user_data")
+    )
+
+    # ── Flask application ─────────────────────────────────────────────────────
     flask_app = Flask(__name__)
     CORS(flask_app)
+
+    # Auth (JWT) — must be initialised before any JWT-protected routes
+    from app.api.auth_routes import init_jwt
+    init_jwt(flask_app)
+    auth_svc = AuthService(
+        users_file=os.path.join(cfg.model_artifacts_dir, "user_data", "users.json")
+    )
 
     # Middleware
     register_error_handlers(flask_app)
@@ -96,16 +113,22 @@ def create_app(cfg: AppConfig | None = None) -> Flask:
     from app.api.v1_routes import make_v1_blueprint
     from app.api.v2_routes import make_v2_blueprint
     from app.api.v3_routes import make_v3_blueprint
+    from app.api.workspace_routes import make_workspace_blueprint
+    from app.api.auth_routes import make_auth_blueprint
 
     flask_app.register_blueprint(health_bp)
+    flask_app.register_blueprint(make_auth_blueprint(auth_svc))
     flask_app.register_blueprint(
         make_v1_blueprint(market_repo, regime_svc, backtest_svc, engine, cfg)
     )
     flask_app.register_blueprint(
-        make_v2_blueprint(training_svc, engine, cache, store, scheduler, cfg)
+        make_v2_blueprint(training_svc, engine, cache, store, scheduler, comparison_svc, cfg)
     )
     flask_app.register_blueprint(
         make_v3_blueprint(training_svc, engine, cache, rate_limiter, cfg)
+    )
+    flask_app.register_blueprint(
+        make_workspace_blueprint(workspace_store, cfg)
     )
 
     # v5 and v7 blueprints (thin wrappers — logic in ml/)

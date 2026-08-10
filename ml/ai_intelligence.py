@@ -205,16 +205,17 @@ class PortfolioOptimizer:
 class MarketSentimentEngine:
     """
     Market Sentiment, News Aggregation, and Economic Calendar Engine.
+    Sentiment scores are computed by VADER with a financial domain lexicon
+    extension — NOT random numbers.
     """
 
     @staticmethod
     def get_market_sentiment(ticker: str = "AAPL") -> Dict[str, Any]:
         """
-        Returns sentiment analysis scores, news headlines, and sector heatmaps.
+        Returns real VADER sentiment scores, representative news headlines,
+        sector heatmaps, and economic calendar.
         """
-        # Synthetic sentiment metrics computed from technical regime & market news
-        sentiment_score = round(random.uniform(0.15, 0.78), 2)  # Score between -1 and +1
-        sentiment_label = "Bullish" if sentiment_score > 0.25 else ("Bearish" if sentiment_score < -0.25 else "Neutral")
+        from ml.sentiment import get_scorer
 
         headlines = [
             {
@@ -251,6 +252,19 @@ class MarketSentimentEngine:
             }
         ]
 
+        # Real VADER scoring — each headline gets its own score
+        scorer = get_scorer()
+        for h in headlines:
+            s = scorer.score(h["title"])
+            h["sentiment"] = s.label
+            h["sentiment_score"] = round(s.compound, 4)
+            h["impact_score"] = round(s.confidence, 4)
+
+        # Aggregate with recency decay (index 0 = most recent)
+        texts = [h["title"] for h in headlines]
+        agg = scorer.score_batch(texts)
+        sentiment_score = round(agg.compound, 4)
+
         # Sector performance heatmap data
         sector_heatmap = [
             {"sector": "Information Technology", "change_pct": 1.42, "sentiment": "Bullish", "regime": "Momentum Breakout"},
@@ -269,15 +283,19 @@ class MarketSentimentEngine:
             {"event": "Retail Sales MoM", "date": "2026-08-22", "impact": "MEDIUM", "consensus": "+0.4%", "previous": "+0.2%"}
         ]
 
+        bullish_pct = int(max(0, min(100, (sentiment_score + 1.0) / 2.0 * 100)))
+
         return {
             "ticker": ticker,
             "overall_sentiment_score": sentiment_score,
-            "sentiment_label": sentiment_label,
-            "bullish_pct": int((sentiment_score + 1.0) / 2.0 * 100),
-            "bearish_pct": 100 - int((sentiment_score + 1.0) / 2.0 * 100),
+            "sentiment_label": agg.label,
+            "sentiment_detail": agg.to_dict(),
+            "bullish_pct": bullish_pct,
+            "bearish_pct": 100 - bullish_pct,
             "news_headlines": headlines,
             "sector_heatmap": sector_heatmap,
-            "economic_calendar": economic_calendar
+            "economic_calendar": economic_calendar,
+            "scoring_engine": "VADER + Financial Lexicon",
         }
 
 
