@@ -11,7 +11,6 @@ Phase 7 core module for StockBuddy:
 """
 
 import time
-import random
 import datetime
 import logging
 from typing import Dict, List, Any, Optional
@@ -69,7 +68,7 @@ class AIMarketSynthesizer:
             {"feature": "20-Day Volatility", "weight": round(float(-0.02 * (vol_20d - 15.0)), 4), "impact": "Negative" if vol_20d > 20 else "Positive"},
             {"feature": "EMA 20/50 Slope", "weight": round(float(ret_1m / 50.0), 4), "impact": "Positive" if ret_1m > 0 else "Negative"},
             {"feature": "Regime Vector Distance", "weight": round(float(confidence * 0.25), 4), "impact": "Positive"},
-            {"feature": "MACD Histogram", "weight": round(float(random.uniform(-0.1, 0.15)), 4), "impact": "Positive"}
+            {"feature": "MACD Histogram", "weight": round(float((rsi - 50.0) * ret_1m / 10000.0), 4), "impact": "Positive" if rsi > 50 and ret_1m > 0 else "Negative"}
         ]
 
         return {
