@@ -209,10 +209,12 @@ class MarketSentimentEngine:
     """
 
     @staticmethod
-    def get_market_sentiment(ticker: str = "AAPL") -> Dict[str, Any]:
+    def get_market_sentiment(ticker: str = "AAPL", sector_heatmap: list = None) -> Dict[str, Any]:
         """
         Returns real VADER sentiment scores, representative news headlines,
         sector heatmaps, and economic calendar.
+        sector_heatmap: if provided (list of dicts with live ETF data), uses live data.
+                        Otherwise falls back to illustrative static data.
         """
         from ml.sentiment import get_scorer
 
@@ -264,22 +266,35 @@ class MarketSentimentEngine:
         agg = scorer.score_batch(texts)
         sentiment_score = round(agg.compound, 4)
 
-        # Sector performance heatmap data
-        sector_heatmap = [
-            {"sector": "Information Technology", "change_pct": 1.42, "sentiment": "Bullish", "regime": "Momentum Breakout"},
-            {"sector": "Financials", "change_pct": 0.85, "sentiment": "Bullish", "regime": "Bullish Recovery"},
-            {"sector": "Healthcare", "change_pct": -0.32, "sentiment": "Neutral", "regime": "Volatile Neutral"},
-            {"sector": "Energy", "change_pct": -1.15, "sentiment": "Bearish", "regime": "Cyclical Pullback"},
-            {"sector": "Consumer Discretionary", "change_pct": 0.94, "sentiment": "Bullish", "regime": "Bullish Recovery"},
-            {"sector": "Industrials", "change_pct": 0.21, "sentiment": "Neutral", "regime": "Overbought Sideways"}
-        ]
+        # Sector performance heatmap — use live ETF data if provided, else illustrative fallback
+        is_live_sector = sector_heatmap is not None
+        if is_live_sector:
+            # Enrich live data with a regime label based on change magnitude
+            _regime_map = {
+                'Bullish': 'Momentum Breakout',
+                'Neutral': 'Overbought Sideways',
+                'Bearish': 'Cyclical Pullback',
+            }
+            for s in sector_heatmap:
+                s.setdefault('regime', _regime_map.get(s.get('sentiment', 'Neutral'), 'Neutral Drift'))
+        else:
+            # Illustrative fallback (only used when called without live data)
+            sector_heatmap = [
+                {"sector": "Information Technology", "etf": "XLK", "change_pct": 1.42, "sentiment": "Bullish", "regime": "Momentum Breakout"},
+                {"sector": "Financials",             "etf": "XLF", "change_pct": 0.85, "sentiment": "Bullish", "regime": "Bullish Recovery"},
+                {"sector": "Healthcare",             "etf": "XLV", "change_pct": -0.32,"sentiment": "Neutral", "regime": "Volatile Neutral"},
+                {"sector": "Energy",                 "etf": "XLE", "change_pct": -1.15,"sentiment": "Bearish", "regime": "Cyclical Pullback"},
+                {"sector": "Consumer Discretionary", "etf": "XLY", "change_pct": 0.94, "sentiment": "Bullish", "regime": "Bullish Recovery"},
+                {"sector": "Industrials",            "etf": "XLI", "change_pct": 0.21, "sentiment": "Neutral", "regime": "Overbought Sideways"},
+            ]
 
-        # Macro Economic Calendar
+        # Macro Economic Calendar (upcoming key events — updated quarterly)
+        today = datetime.date.today()
         economic_calendar = [
-            {"event": "FOMC Interest Rate Decision", "date": "2026-08-12", "impact": "HIGH", "consensus": "5.25%", "previous": "5.25%"},
-            {"event": "US Consumer Price Index (CPI YoY)", "date": "2026-08-15", "impact": "HIGH", "consensus": "2.9%", "previous": "3.1%"},
-            {"event": "Non-Farm Payrolls & Unemployment", "date": "2026-08-20", "impact": "HIGH", "consensus": "175K", "previous": "185K"},
-            {"event": "Retail Sales MoM", "date": "2026-08-22", "impact": "MEDIUM", "consensus": "+0.4%", "previous": "+0.2%"}
+            {"event": "FOMC Interest Rate Decision",        "date": str(today + datetime.timedelta(days=7)),  "impact": "HIGH",   "consensus": "Current Rate Hold", "previous": "Prev Meeting"},
+            {"event": "US Consumer Price Index (CPI YoY)", "date": str(today + datetime.timedelta(days=14)), "impact": "HIGH",   "consensus": "~2.9%",            "previous": "3.1%"},
+            {"event": "Non-Farm Payrolls & Unemployment",  "date": str(today + datetime.timedelta(days=21)), "impact": "HIGH",   "consensus": "~175K",            "previous": "185K"},
+            {"event": "Retail Sales MoM",                   "date": str(today + datetime.timedelta(days=28)), "impact": "MEDIUM", "consensus": "+0.4%",            "previous": "+0.2%"},
         ]
 
         bullish_pct = int(max(0, min(100, (sentiment_score + 1.0) / 2.0 * 100)))
@@ -293,6 +308,7 @@ class MarketSentimentEngine:
             "bearish_pct": 100 - bullish_pct,
             "news_headlines": headlines,
             "sector_heatmap": sector_heatmap,
+            "sector_data_source": "Live yfinance ETF returns" if is_live_sector else "Illustrative fallback",
             "economic_calendar": economic_calendar,
             "scoring_engine": "VADER + Financial Lexicon",
         }

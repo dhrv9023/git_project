@@ -64,8 +64,15 @@
     }
     body.light-mode nav { background: rgba(255,255,255,0.92); }
     body.light-mode .hero h1 {
-      background: linear-gradient(135deg, #0f172a 0%, #0284c7 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      color: #0f172a;
+      background: none;
+      -webkit-text-fill-color: initial;
+    }
+    body.light-mode .hero-gradient-text {
+      background: linear-gradient(135deg, #0284c7 0%, #16a34a 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
     body.light-mode .section-title,
     body.light-mode .pipe-step h3,
@@ -130,96 +137,288 @@
     .vector-preview { font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: var(--green); line-height: 1.6; white-space: pre-wrap; margin: 0; }
 
 
+    /* ── PARTICLES BACKGROUND CANVAS ── */
+    #particles {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
     /* ── HERO LIVE QUANT COMMAND STUDIO ── */
     .hero {
-      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-      position: relative; padding: 6.5rem 5% 4rem; overflow: hidden; background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      position: relative;
+      padding: 7.5rem 5% 4.5rem;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 18%, rgba(0, 255, 224, 0.08) 0%, rgba(8, 12, 16, 0) 70%), var(--bg);
+      text-align: center;
     }
+    body.light-mode .hero {
+      background: radial-gradient(circle at 50% 18%, rgba(2, 132, 199, 0.07) 0%, rgba(248, 250, 252, 0) 70%), var(--bg);
+    }
+    .hero > * {
+      position: relative;
+      z-index: 2;
+    }
+
     .hero-ticker-tape {
-      width: 100%; max-width: 1000px; background: var(--bg2); border: 1px solid var(--border);
-      border-radius: 999px; padding: .45rem 1.4rem; display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 1.8rem; z-index: 2; font-family: 'JetBrains Mono', monospace; font-size: .78rem; color: var(--muted);
-      overflow-x: hidden; white-space: nowrap; gap: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      width: 100%;
+      max-width: 1000px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: .45rem 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.8rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .78rem;
+      color: var(--muted);
+      overflow-x: auto;
+      white-space: nowrap;
+      gap: 1.5rem;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.2);
       scrollbar-width: none;
     }
     .hero-ticker-tape::-webkit-scrollbar { display: none; }
 
-    .ticker-item { display: flex; align-items: center; gap: .5rem; }
+    .ticker-item {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      flex-shrink: 0;
+    }
     .ticker-sym { color: var(--text); font-weight: 700; }
     .ticker-up { color: var(--green); font-weight: 600; }
     .ticker-down { color: #ff4757; font-weight: 600; }
-    .ticker-tag { background: var(--bg3); padding: .15rem .4rem; border-radius: 4px; font-size: .7rem; border: 1px solid var(--border); color: var(--cyan); }
-
-    .hero-badge-tag {
-      display: inline-flex; align-items: center; gap: .6rem;
-      background: var(--bg2); border: 1px solid var(--border);
-      border-radius: 8px; padding: .4rem .9rem; font-size: .76rem;
-      color: var(--cyan); margin-bottom: 1.8rem; letter-spacing: .06em; font-family: 'JetBrains Mono', monospace;
+    .ticker-tag {
+      background: var(--bg3);
+      padding: .15rem .45rem;
+      border-radius: 4px;
+      font-size: .68rem;
+      border: 1px solid var(--border);
+      color: var(--cyan);
       font-weight: 600;
     }
-    .hero-badge-tag .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 1.8s infinite; }
+
+    .hero-badge-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: .6rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: .4rem 1.1rem;
+      font-size: .76rem;
+      color: var(--cyan);
+      margin-bottom: 1.5rem;
+      letter-spacing: .06em;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      box-shadow: 0 2px 12px rgba(0,255,224,0.06);
+    }
+    .hero-badge-tag .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 1.8s infinite;
+      box-shadow: 0 0 8px var(--green);
+    }
     
     .hero h1 {
-      font-size: clamp(2.5rem, 5.5vw, 4.6rem); font-weight: 900; line-height: 1.1;
-      margin-bottom: 1.4rem; text-align: center; color: var(--text);
-      letter-spacing: -.02em;
+      font-size: clamp(2.4rem, 5.2vw, 4.4rem);
+      font-weight: 900;
+      line-height: 1.15;
+      margin-bottom: 1.3rem;
+      text-align: center;
+      color: var(--text);
+      letter-spacing: -.03em;
+      max-width: 960px;
     }
     .hero-gradient-text {
       background: linear-gradient(135deg, var(--cyan) 0%, var(--green) 100%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      display: inline-block;
     }
     
     .hero-sub {
-      font-size: clamp(1rem, 1.8vw, 1.12rem); color: var(--muted);
-      max-width: 760px; margin: 0 auto 2.2rem; text-align: center; line-height: 1.7;
+      font-size: clamp(1rem, 1.6vw, 1.12rem);
+      color: var(--muted);
+      max-width: 740px;
+      margin: 0 auto 2.2rem;
+      text-align: center;
+      line-height: 1.7;
     }
 
     /* Hero Live Quick-Runner Bar */
     .hero-quick-runner {
-      background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
-      padding: 1rem 1.2rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
-      justify-content: space-between; max-width: 820px; width: 100%; margin: 0 auto 2.8rem; z-index: 2;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.15); transition: border-color .3s;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: .85rem 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      max-width: 840px;
+      width: 100%;
+      margin: 0 auto 2.6rem;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.22);
+      backdrop-filter: blur(12px);
+      transition: all .3s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .hero-quick-runner:focus-within { border-color: var(--cyan); box-shadow: 0 0 25px rgba(0,255,224,0.15); }
-    .hero-input-group { display: flex; align-items: center; gap: .6rem; flex: 1; min-width: 220px; }
-    .hero-input-group label { font-family: 'JetBrains Mono', monospace; font-size: .78rem; font-weight: 700; color: var(--cyan); white-space: nowrap; }
+    .hero-quick-runner:focus-within {
+      border-color: var(--cyan);
+      box-shadow: 0 0 30px rgba(0,255,224,0.2);
+    }
+    .hero-input-group {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      flex: 1;
+      min-width: 200px;
+    }
+    .hero-input-group label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--cyan);
+      white-space: nowrap;
+    }
     .hero-input-group input {
-      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-      color: var(--text); padding: .65rem .9rem; font-size: .95rem; font-family: 'JetBrains Mono', monospace;
-      width: 100%; outline: none; transition: border-color .2s; text-transform: uppercase;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: .65rem .9rem;
+      font-size: .95rem;
+      font-family: 'JetBrains Mono', monospace;
+      width: 100%;
+      outline: none;
+      transition: all .2s;
+      text-transform: uppercase;
+      font-weight: 600;
     }
-    .hero-input-group input:focus { border-color: var(--cyan); }
+    .hero-input-group input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px rgba(0,255,224,0.15);
+    }
     
-    .hero-chip-row { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
-    .hero-chip {
-      background: var(--bg3); border: 1px solid var(--border); border-radius: 6px;
-      padding: .4rem .7rem; font-size: .76rem; font-family: 'JetBrains Mono', monospace;
-      color: var(--muted); cursor: pointer; transition: all .2s; font-weight: 600;
+    .hero-chip-row {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      flex-wrap: wrap;
     }
-    .hero-chip:hover { border-color: var(--cyan); color: var(--cyan); }
+    .hero-chip {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: .4rem .7rem;
+      font-size: .76rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .2s;
+      font-weight: 600;
+      user-select: none;
+    }
+    .hero-chip:hover, .hero-chip.active {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: rgba(0,255,224,0.08);
+      transform: translateY(-1px);
+    }
 
     .hero-run-btn {
-      background: var(--cyan); color: #080c10; border: none; border-radius: 8px;
-      padding: .7rem 1.6rem; font-size: .92rem; font-weight: 700; cursor: pointer;
-      font-family: inherit; transition: all .25s ease; white-space: nowrap; text-decoration: none;
-      display: inline-flex; align-items: center; gap: .4rem;
+      background: linear-gradient(135deg, var(--cyan) 0%, #00d2b4 100%);
+      color: #080c10;
+      border: none;
+      border-radius: 8px;
+      padding: .7rem 1.6rem;
+      font-size: .92rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all .25s ease;
+      white-space: nowrap;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      letter-spacing: .02em;
     }
-    .hero-run-btn:hover { box-shadow: 0 0 25px rgba(0,255,224,0.4); transform: translateY(-2px); }
+    .hero-run-btn:hover {
+      box-shadow: 0 0 28px rgba(0,255,224,0.45);
+      transform: translateY(-2px);
+      filter: brightness(1.08);
+    }
+    .hero-run-btn:active {
+      transform: translateY(0);
+    }
 
     /* Glassmorphic Stats Strip */
     .hero-stats-strip {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2rem;
-      width: 100%; max-width: 1000px; margin-top: .5rem; z-index: 2;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.2rem;
+      width: 100%;
+      max-width: 1000px;
+      margin-top: .5rem;
     }
-    @media (max-width: 850px) { .hero-stats-strip { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 850px) {
+      .hero-stats-strip { grid-template-columns: repeat(2, 1fr); }
+      .hero-quick-runner { flex-direction: column; align-items: stretch; }
+      .hero-chip-row { justify-content: center; }
+      .hero-run-btn { justify-content: center; }
+    }
+    @media (max-width: 520px) {
+      .hero-stats-strip { grid-template-columns: 1fr; }
+      .hero { padding: 6.5rem 4% 3rem; }
+    }
     .hero-stat-node {
-      background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
-      padding: 1.1rem 1.3rem; display: flex; flex-direction: column; gap: .3rem; text-align: left;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.1rem 1.3rem;
+      display: flex;
+      flex-direction: column;
+      gap: .3rem;
+      text-align: left;
+      transition: all .25s ease;
     }
-    .hero-stat-val { font-size: 1.35rem; font-weight: 800; color: var(--cyan); font-family: 'JetBrains Mono', monospace; }
-    .hero-stat-lbl { font-size: .8rem; font-weight: 700; color: var(--text); }
-    .hero-stat-sub { font-size: .72rem; color: var(--muted); }
+    .hero-stat-node:hover {
+      border-color: rgba(0,255,224,0.35);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0,255,224,0.08);
+    }
+    .hero-stat-val {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--cyan);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .hero-stat-lbl {
+      font-size: .8rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .hero-stat-sub {
+      font-size: .72rem;
+      color: var(--muted);
+    }
 
 
     /* ── SECTION SHARED ── */
@@ -936,19 +1135,11 @@
   <section class="hero">
     <canvas id="particles"></canvas>
     
-    <!-- Top Live Ticker Tape Ribbon -->
-    <div class="hero-ticker-tape">
-      <div class="ticker-item">
-        <span class="ticker-sym">AAPL</span> <span class="ticker-up">$224.30 ▲ +1.4%</span> <span class="ticker-tag">BULL RECOVERY</span>
-      </div>
-      <div class="ticker-item">
-        <span class="ticker-sym">NVDA</span> <span class="ticker-up">$118.50 ▲ +2.8%</span> <span class="ticker-tag">TRENDING BULL</span>
-      </div>
-      <div class="ticker-item">
-        <span class="ticker-sym">TSLA</span> <span class="ticker-down">$248.20 ▼ -0.9%</span> <span class="ticker-tag">OVERBOUGHT</span>
-      </div>
-      <div class="ticker-item">
-        <span class="ticker-sym">SPY</span> <span class="ticker-up">$542.10 ▲ +0.4%</span> <span class="ticker-tag">NEUTRAL VOL</span>
+    <!-- Top Live Ticker Tape Ribbon — populated dynamically via /api/v1/quotes -->
+    <div class="hero-ticker-tape" id="heroTickerTape">
+      <!-- Loading skeleton shown until live data arrives -->
+      <div class="ticker-item" style="color:var(--muted);opacity:0.6;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:.74rem;">⟳ Fetching live prices...</span>
       </div>
     </div>
 
@@ -1490,6 +1681,18 @@ Top Matches Identified:
         </div>
       </div>
 
+      <!-- Data Quality Transparency Row — populated from /api/regime data_quality field -->
+      <div id="dataQualityRow" style="display:none;margin:0 0 1.4rem;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:.7rem 1.2rem;align-items:center;gap:1.6rem;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--cyan);font-family:'JetBrains Mono',monospace;">🔬 Data Quality</span>
+        </div>
+        <div style="font-size:.78rem;color:var(--muted);font-family:'JetBrains Mono',monospace;">Raw: <strong id="dqRawRows" style="color:var(--text)">—</strong> rows</div>
+        <div style="font-size:.78rem;color:var(--muted);font-family:'JetBrains Mono',monospace;">Clean: <strong id="dqCleanRows" style="color:var(--green)">—</strong> rows</div>
+        <div style="font-size:.78rem;color:var(--muted);font-family:'JetBrains Mono',monospace;">Outliers Removed: <strong id="dqOutliers" style="color:var(--amber)">—</strong></div>
+        <div style="font-size:.78rem;color:var(--muted);font-family:'JetBrains Mono',monospace;">Gaps Filled: <strong id="dqGaps" style="color:var(--text)">—</strong></div>
+        <div style="font-size:.72rem;color:var(--muted);">Methods: <span id="dqMethods">IQR 3x · Winsorization p1/p99 · ffill/bfill</span></div>
+      </div>
+
       <!-- Charts row: timeline + odds -->
       <div class="charts-row">
         <div class="chart-card">
@@ -1702,13 +1905,14 @@ Top Matches Identified:
 
     <!-- AI INTELLIGENCE DASHBOARD -->
     <div id="aiDashboard" style="margin-top:2rem;">
-      <!-- ROW 1: LLM MARKET BRIEF & XAI ATTRIBUTION -->
+      <!-- ROW 1: AI-SYNTHESIZED MARKET BRIEF & XAI ATTRIBUTION -->
       <div class="qlab-charts-2col">
         <div class="qlab-panel">
           <div class="qlab-panel-title">
-            <span>🧠 LLM Market Executive Brief</span>
+            <span>🧠 AI-Synthesized Market Brief</span>
             <span class="inspector-badge" id="aiSentimentBadge" style="background:rgba(0,255,224,0.1);color:var(--cyan);">BULLISH</span>
           </div>
+          <p style="font-size:.7rem;color:var(--muted);margin-bottom:.8rem;font-family:'JetBrains Mono',monospace;">Engine: Structured Template NLP + VADER Sentiment Scoring</p>
           <h3 id="aiHeadline" style="font-size:1.1rem;color:var(--text);margin-bottom:.8rem;font-weight:700;">
             AI Intelligence Brief: Loading natural language synthesis...
           </h3>
@@ -2133,20 +2337,40 @@ Top Matches Identified:
     });
 
 
-    // Particles
+    // Particles Background Canvas Animation
     const pc = document.getElementById('particles');
-    const px = pc.getContext('2d');
-    function resizeP() { pc.width = window.innerWidth; pc.height = window.innerHeight; }
-    resizeP(); window.addEventListener('resize', resizeP);
-    const pts = Array.from({length:90}, () => ({
-      x: Math.random()*pc.width, y: Math.random()*pc.height,
-      vx:(Math.random()-.5)*.4, vy:(Math.random()-.5)*.4, r:Math.random()*1.8+.4
-    }));
-    (function animP(){ px.clearRect(0,0,pc.width,pc.height); px.fillStyle='rgba(0,255,224,0.45)';
-      pts.forEach(p=>{ p.x+=p.vx; p.y+=p.vy;
-        if(p.x<0||p.x>pc.width)p.vx*=-1; if(p.y<0||p.y>pc.height)p.vy*=-1;
-        px.beginPath(); px.arc(p.x,p.y,p.r,0,Math.PI*2); px.fill();
-      }); requestAnimationFrame(animP); })();
+    const px = pc ? pc.getContext('2d') : null;
+    function resizeP() {
+      if (!pc) return;
+      const heroEl = document.querySelector('.hero');
+      pc.width = heroEl ? heroEl.offsetWidth : window.innerWidth;
+      pc.height = heroEl ? heroEl.offsetHeight : window.innerHeight;
+    }
+    if (pc && px) {
+      resizeP();
+      window.addEventListener('resize', resizeP);
+      const pts = Array.from({length: 80}, () => ({
+        x: Math.random() * (pc.width || window.innerWidth),
+        y: Math.random() * (pc.height || window.innerHeight),
+        vx: (Math.random() - .5) * .35,
+        vy: (Math.random() - .5) * .35,
+        r: Math.random() * 1.6 + .4
+      }));
+      (function animP() {
+        px.clearRect(0, 0, pc.width, pc.height);
+        px.fillStyle = 'rgba(0, 255, 224, 0.4)';
+        pts.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < 0 || p.x > pc.width) p.vx *= -1;
+          if (p.y < 0 || p.y > pc.height) p.vy *= -1;
+          px.beginPath();
+          px.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          px.fill();
+        });
+        requestAnimationFrame(animP);
+      })();
+    }
 
     // FAQ
     document.querySelectorAll('.faq-item').forEach(item=>{
@@ -2267,6 +2491,7 @@ Top Matches Identified:
       renderTimeline(d.timeline);
       renderSimilarMatches(d.similar_matches);
       renderQuantBacktest(d.quant_backtest);
+      if (typeof renderDataQuality === 'function') renderDataQuality(d.data_quality);
       document.getElementById('regimeDashboard').style.display='block';
     }
 
@@ -2663,19 +2888,95 @@ Top Matches Identified:
       document.getElementById('p4Val').textContent = data.p4_val;
     }
 
+    // ── Live Ticker Tape: /api/v1/quotes ─────────────────────────────────────
+    async function fetchLiveQuotes() {
+      const tape = document.getElementById('heroTickerTape');
+      if (!tape) return;
+      try {
+        const res = await fetch('/api/v1/quotes?tickers=AAPL,NVDA,TSLA,SPY');
+        if (!res.ok) throw new Error('quotes fetch failed');
+        const data = await res.json();
+        const quotes = data.quotes || [];
+        if (!quotes.length) return;
+        tape.innerHTML = quotes.map(q => {
+          const priceStr = q.price != null ? `$${q.price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+          const chgStr  = q.change_pct != null ? `${q.change_pct >= 0 ? '▲ +' : '▼ '}${Math.abs(q.change_pct).toFixed(2)}%` : '';
+          const cls     = q.direction === 'up' ? 'ticker-up' : (q.direction === 'down' ? 'ticker-down' : '');
+          return `<div class="ticker-item">
+            <span class="ticker-sym">${q.symbol}</span>
+            <span class="${cls}">${priceStr} ${chgStr}</span>
+          </div>`;
+        }).join('');
+        // Update "fetched at" on the live badge unobtrusively
+        const badge = document.querySelector('.hero-badge-tag');
+        if (badge) {
+          const t = new Date(data.fetched_at);
+          const ts = t.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+          badge.innerHTML = `<span class="dot"></span> LIVE: YFINANCE · K-MEANS k=6 · PYTORCH DL &nbsp;·&nbsp; <span style="color:var(--cyan);">Updated ${ts}</span>`;
+        }
+      } catch (e) {
+        // Leave skeleton or last values in place — silent fail
+        console.warn('[quotes] Failed to fetch live prices:', e.message);
+      }
+    }
+    // Fetch on load and refresh every 60 seconds
+    fetchLiveQuotes();
+    setInterval(fetchLiveQuotes, 60000);
+
+    // ── Data Quality Renderer ─────────────────────────────────────────────────
+    function renderDataQuality(dq) {
+      if (!dq || !dq.raw_rows) return;
+      const row = document.getElementById('dataQualityRow');
+      if (!row) return;
+      document.getElementById('dqRawRows').textContent   = dq.raw_rows;
+      document.getElementById('dqCleanRows').textContent = dq.clean_rows;
+      document.getElementById('dqOutliers').textContent  = dq.outliers_removed;
+      document.getElementById('dqGaps').textContent      = dq.gaps_filled;
+      if (dq.cleaning_methods && document.getElementById('dqMethods')) {
+        document.getElementById('dqMethods').textContent = dq.cleaning_methods.join(' · ');
+      }
+      row.style.display = 'flex';
+    }
+
     // Hero Quick Runner Helpers
     function quickHeroRun(symbol) {
-      document.getElementById('heroTickerInput').value = symbol;
+      const heroInput = document.getElementById('heroTickerInput');
+      if (heroInput) heroInput.value = symbol;
+      document.querySelectorAll('.hero-chip').forEach(chip => {
+        chip.classList.toggle('active', chip.textContent.trim() === symbol);
+      });
       executeHeroRun();
     }
 
     function executeHeroRun() {
-      const ticker = (document.getElementById('heroTickerInput').value || 'AAPL').trim().toUpperCase();
-      document.getElementById('tickerInput').value = ticker;
-      // Trigger regime analysis if fetchRegimeData is available
-      if (typeof fetchRegimeData === 'function') {
-        fetchRegimeData();
+      const heroInp = document.getElementById('heroTickerInput');
+      const ticker = ((heroInp ? heroInp.value : '') || 'AAPL').trim().toUpperCase();
+      
+      const regimeInp = document.getElementById('regimeTicker');
+      if (regimeInp) {
+        regimeInp.value = ticker;
       }
+      
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      if (analyzeBtn) {
+        analyzeBtn.click();
+      }
+      
+      const regimeSec = document.getElementById('regime');
+      if (regimeSec) {
+        regimeSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    // Hero Input Enter Key Handler
+    const heroInputDom = document.getElementById('heroTickerInput');
+    if (heroInputDom) {
+      heroInputDom.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          executeHeroRun();
+        }
+      });
     }
 
     // Quick Date Range Shortcuts (1Y, 3Y, 5Y, 10Y, 15Y)

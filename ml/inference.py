@@ -29,7 +29,12 @@ import pickle
 import hashlib
 import logging
 import threading
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ml.registry import ModelRegistry
+    from storage.model_store import ModelStore
+    from core.config import AppConfig
 
 log = logging.getLogger(__name__)
 
@@ -133,7 +138,7 @@ class InferenceEngine:
       5. Store result in cache; return to caller
     """
 
-    def __init__(self, registry, store, cache: InferenceCache, cfg):
+    def __init__(self, registry: Any, store: Any, cache: InferenceCache, cfg: Any):
         self.registry = registry
         self.store    = store
         self.cache    = cache
@@ -142,7 +147,7 @@ class InferenceEngine:
         self._artifact_cache: Dict[str, Any] = {}
         self._artifact_lock  = threading.Lock()
 
-    def _load_artifacts(self, ticker: str, version: str) -> Optional[Dict]:
+    def _load_artifacts(self, ticker: str, version: str) -> Optional[Dict[str, Any]]:
         """Load model artifacts, using in-process warm cache to avoid repeated disk I/O."""
         key = f"{ticker.upper()}_{version}"
         with self._artifact_lock:
@@ -154,7 +159,7 @@ class InferenceEngine:
                 self._artifact_cache[key] = arts
         return arts
 
-    def evict_artifacts(self, ticker: str = None):
+    def evict_artifacts(self, ticker: Optional[str] = None):
         """Remove loaded artifacts from warm cache (call after retraining)."""
         with self._artifact_lock:
             if ticker:
@@ -183,7 +188,7 @@ class InferenceEngine:
             dict with keys: predictions, metrics, confidence, dates,
                             version_used, from_cache, model_path
         """
-        import sys, math
+        import math
         import numpy as np
 
         ticker = ticker.upper()
@@ -226,28 +231,58 @@ class InferenceEngine:
         seq_len     = metadata.get("seq_len", self.cfg.sequence_length)
         close_idx   = metadata.get("close_feature_index", 0)
 
-        # ── Run data pipeline ─────────────────────────────────────────────────
-        app_mod = sys.modules.get("__main__") or sys.modules.get("app")
-        prepare_data    = app_mod.prepare_data
-        split_and_scale = app_mod.split_and_scale_data
-        evaluate_fn     = app_mod.evaluate_and_ensemble
-        run_bt          = app_mod.run_backtest
-        scale_sf        = app_mod.scale_single_feature
+        # ── Run data pipeline & evaluation via modular architecture ───────────
+        from ml.features import split_and_scale_data, scale_single_feature
+        from app.repositories.market_data_repo import MarketDataRepository
+        from app.services.backtest_service import BacktestService
 
-        data   = prepare_data(ticker, start_date, end_date, seq_len)
-        splits = split_and_scale(
+        market_repo = MarketDataRepository()
+        data = market_repo.build_feature_matrix(ticker, start_date, end_date, seq_len)
+        splits = split_and_scale_data(
             data["X_raw"], data["y_raw"], data["dates_raw"], data["base_prices_raw"],
             self.cfg.train_split, self.cfg.val_split, seq_len,
         )
 
         # ── Evaluate on test partition ────────────────────────────────────────
-        eval_results = evaluate_fn(models_dict, splits, scaler_y)
+        X_test, y_test, dates_test, base_test = splits["test"]
+        preds = {}
+        metrics_all = {}
+        bt_svc = BacktestService(self.cfg)
+
+        logret_true = scaler_y.inverse_transform(y_test.reshape(-1, 1)).ravel()
+        y_true = base_test * np.exp(logret_true)
+        for name, mdl in models_dict.items():
+            if name.endswith("_history"):
+                continue
+            y_pred_scaled = mdl.predict(X_test, verbose=0).ravel()
+            logret_pred = scaler_y.inverse_transform(y_pred_scaled.reshape(-1, 1)).ravel()
+            price_pred = base_test * np.exp(logret_pred)
+            preds[name] = price_pred
+            metrics_all[name] = bt_svc.calculate_metrics(y_true, price_pred)
+
+        model_names = [k for k in models_dict.keys() if not k.endswith("_history")]
+        y_stack = np.stack([preds[n] for n in model_names], axis=1)
+        weights = np.ones(len(model_names), dtype=np.float32) / float(len(model_names))
+        y_ens = (y_stack * weights).sum(axis=1)
+        preds["Ensemble"] = y_ens
+        metrics_all["Ensemble"] = bt_svc.calculate_metrics(y_true, y_ens)
+
+        std = y_stack.std(axis=1) if len(model_names) > 1 else np.zeros_like(y_ens)
+        lower = y_ens - 1.96 * std
+        upper = y_ens + 1.96 * std
+
+        eval_results = {
+            "predictions": preds,
+            "metrics": metrics_all,
+            "y_test_actual": y_true,
+            "dates_test": dates_test,
+            "confidence_intervals": (lower, upper),
+        }
 
         # Backtest
-        bt = run_bt(
+        bt = bt_svc.run_signal_backtest(
             eval_results["predictions"]["Ensemble"],
             eval_results["y_test_actual"],
-            eval_results["dates_test"],
             self.cfg.initial_capital,
         )
 
@@ -271,7 +306,7 @@ class InferenceEngine:
             price  = price * float(np.exp(avg_lr))
             future_preds.append(round(price, 4))
             seq = np.roll(seq, -1, axis=0)
-            seq[-1, close_idx] = scale_sf(price, scaler_X, close_idx)
+            seq[-1, close_idx] = scale_single_feature(price, scaler_X, close_idx)
 
         import pandas as pd
         last_date    = eval_results["dates_test"][-1]

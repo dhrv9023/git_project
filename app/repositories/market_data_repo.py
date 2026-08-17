@@ -107,11 +107,13 @@ class MarketDataRepository:
         cleaned = cleaned[~cleaned.index.duplicated(keep="first")]
         cleaned = cleaned.replace([np.inf, -np.inf], np.nan).ffill().bfill().dropna()
 
-        returns = cleaned["Close"].pct_change().dropna()
-        q1, q3 = returns.quantile([0.25, 0.75])
-        iqr = q3 - q1
-        mask = (returns.between(q1 - 3 * iqr, q3 + 3 * iqr)) | returns.isna()
-        cleaned = cleaned.loc[mask]
+        returns = cleaned["Close"].pct_change()
+        ret_no_na = returns.dropna()
+        if not ret_no_na.empty:
+            q1, q3 = ret_no_na.quantile([0.25, 0.75])
+            iqr = q3 - q1
+            mask = (returns.between(q1 - 3 * iqr, q3 + 3 * iqr)) | returns.isna()
+            cleaned = cleaned.loc[mask]
 
         num_cols = cleaned.select_dtypes(include=[np.number]).columns
         cleaned[num_cols] = cleaned[num_cols].clip(

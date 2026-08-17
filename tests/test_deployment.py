@@ -50,6 +50,12 @@ class TestDeploymentFeatures(unittest.TestCase):
         self.assertIsInstance(cfg.debug, bool)
         self.assertIsInstance(cfg.security_headers_enabled, bool)
 
+    def test_root_serves_index_html(self):
+        """Test GET / returns HTTP 200 and serves index.html."""
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'StockBuddy', response.data)
+
 
 if __name__ == '__main__':
     unittest.main()

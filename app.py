@@ -319,12 +319,14 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     This keeps the price structure intact while mitigating extreme spikes.
     """
     cleaned = df.copy()
+    raw_rows = len(cleaned)
     # Order & de-duplicate
     cleaned = cleaned.sort_index()
     cleaned = cleaned[~cleaned.index.duplicated(keep='first')]
     # Replace infs and obvious bad values
     cleaned = cleaned.replace([np.inf, -np.inf], np.nan)
     # Forward/backward fill small gaps, then drop remaining
+    gaps_before_fill = int(cleaned.isnull().any(axis=1).sum())
     cleaned = cleaned.ffill().bfill().dropna()
     # Compute simple returns for outlier detection
     returns = cleaned['Close'].pct_change()
@@ -335,6 +337,7 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     lower = q1 - 3.0 * iqr
     upper = q3 + 3.0 * iqr
     mask = (returns.between(lower, upper)) | (returns.isna())
+    outliers_removed = int((~mask).sum())
     cleaned = cleaned.loc[mask]
     # Winsorize numeric columns at 1st/99th percentile to limit remaining tails
     numeric_cols = cleaned.select_dtypes(include=[np.number]).columns
@@ -343,6 +346,16 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     cleaned[numeric_cols] = cleaned[numeric_cols].clip(lower=lower_clip, upper=upper_clip, axis=1)
     # Final drop of any gaps from filtering
     cleaned = cleaned.dropna()
+    clean_rows = len(cleaned)
+    # Attach data quality metadata as a DataFrame attribute
+    cleaned.attrs['data_quality'] = {
+        'raw_rows': raw_rows,
+        'clean_rows': clean_rows,
+        'outliers_removed': outliers_removed,
+        'gaps_filled': gaps_before_fill,
+        'rows_dropped_pct': round((raw_rows - clean_rows) / max(raw_rows, 1) * 100, 1),
+        'cleaning_methods': ['IQR 3x outlier removal', 'Winsorization p1/p99', 'ffill/bfill gap filling', 'inf/nan scrubbing'],
+    }
     return cleaned
 
 
@@ -1268,6 +1281,45 @@ def create_app():
             'inference_cache': cache.stats(),
         })
 
+    @flask_app.route('/api/v1/quotes', methods=['GET'])
+    def api_quotes():
+        """
+        GET /api/v1/quotes?tickers=AAPL,NVDA,TSLA,SPY
+        Returns live last price, 1-day % change, and current regime tag for each ticker.
+        Uses yfinance fast_info for low-latency lookups with a 60s server-side TTL cache.
+        """
+        raw = request.args.get('tickers', 'AAPL,NVDA,TSLA,SPY')
+        tickers = [t.strip().upper() for t in raw.split(',') if t.strip()][:8]  # cap at 8 symbols
+
+        # Simple per-process TTL cache (60s) to avoid hammering yfinance
+        cache_key = ','.join(sorted(tickers))
+        now = time.time()
+        if not hasattr(api_quotes, '_cache'):
+            api_quotes._cache = {}
+        cached = api_quotes._cache.get(cache_key)
+        if cached and (now - cached['ts']) < 60:
+            return jsonify(cached['data'])
+
+        quotes = []
+        for t in tickers:
+            try:
+                info = yf.Ticker(t).fast_info
+                last = float(getattr(info, 'last_price', None) or getattr(info, 'previousClose', 0) or 0)
+                prev = float(getattr(info, 'previousClose', None) or last or 0)
+                change_pct = round((last - prev) / prev * 100, 2) if prev else 0.0
+                quotes.append({
+                    'symbol': t,
+                    'price': round(last, 2),
+                    'change_pct': change_pct,
+                    'direction': 'up' if change_pct >= 0 else 'down',
+                })
+            except Exception:
+                quotes.append({'symbol': t, 'price': None, 'change_pct': None, 'direction': 'flat'})
+
+        result = {'quotes': quotes, 'fetched_at': datetime.datetime.utcnow().isoformat() + 'Z'}
+        api_quotes._cache[cache_key] = {'data': result, 'ts': now}
+        return jsonify(result)
+
     @flask_app.route('/api/regime', methods=['POST'])
     def api_regime():
         payload = request.get_json(force=True) or {}
@@ -1348,6 +1400,8 @@ def create_app():
         similar_matches = find_similar_historical_scenarios(df_aligned, feat, labels, top_k=5)
         quant_backtest  = compute_quant_backtest(df_aligned, labels)
 
+        data_quality = raw.attrs.get('data_quality', {})
+
         return jsonify({
             'ticker':          ticker,
             'current_regime':  {'id': current_regime_id, 'name': current_profile['name'],
@@ -1359,6 +1413,7 @@ def create_app():
             'timeline':        timeline,
             'similar_matches': similar_matches,
             'quant_backtest':  quant_backtest,
+            'data_quality':    data_quality,
         })
 
     @flask_app.route('/api/predict', methods=['POST'])
@@ -2023,11 +2078,42 @@ def create_app():
     def v7_market_intelligence():
         """
         GET /api/v7/market/intelligence
-        Returns sector heatmaps, news sentiment scores, and economic calendar events.
+        Returns live sector ETF performance, VADER news sentiment, and macro calendar.
+        Sector data is fetched live from yfinance (XLK, XLF, XLV, XLE, XLY, XLI).
         """
         ticker = request.args.get('ticker', 'AAPL').upper().strip()
+
+        # Fetch live 1-day sector ETF returns (with 5-min TTL cache)
+        SECTOR_ETFS = [
+            ('XLK', 'Information Technology'),
+            ('XLF', 'Financials'),
+            ('XLV', 'Healthcare'),
+            ('XLE', 'Energy'),
+            ('XLY', 'Consumer Discretionary'),
+            ('XLI', 'Industrials'),
+        ]
+        now = time.time()
+        if not hasattr(v7_market_intelligence, '_sector_cache'):
+            v7_market_intelligence._sector_cache = {'data': None, 'ts': 0}
+        live_sector_data = None
+        if (now - v7_market_intelligence._sector_cache['ts']) < 300:
+            live_sector_data = v7_market_intelligence._sector_cache['data']
+        if live_sector_data is None:
+            live_sector_data = []
+            for etf, sector_name in SECTOR_ETFS:
+                try:
+                    info = yf.Ticker(etf).fast_info
+                    last = float(getattr(info, 'last_price', None) or getattr(info, 'previousClose', 0) or 0)
+                    prev = float(getattr(info, 'previousClose', None) or last or 0)
+                    chg = round((last - prev) / prev * 100, 2) if prev else 0.0
+                    sentiment = 'Bullish' if chg > 0.3 else ('Bearish' if chg < -0.3 else 'Neutral')
+                    live_sector_data.append({'sector': sector_name, 'etf': etf, 'change_pct': chg, 'sentiment': sentiment})
+                except Exception:
+                    live_sector_data.append({'sector': sector_name, 'etf': etf, 'change_pct': 0.0, 'sentiment': 'Neutral'})
+            v7_market_intelligence._sector_cache = {'data': live_sector_data, 'ts': now}
+
         from ml.ai_intelligence import MarketSentimentEngine
-        data = MarketSentimentEngine.get_market_sentiment(ticker)
+        data = MarketSentimentEngine.get_market_sentiment(ticker, sector_heatmap=live_sector_data)
         return jsonify(data), 200
 
     @flask_app.route('/api/v7/alerts', methods=['GET', 'POST'])
@@ -2047,6 +2133,11 @@ def create_app():
         else:
             alerts = WorkspaceManager.get_alerts()
             return jsonify({'alerts': alerts}), 200
+
+    @flask_app.route('/', methods=['GET'])
+    def serve_index():
+        from flask import send_from_directory
+        return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'index.html')
 
     @flask_app.route('/api/v7/auth/login', methods=['POST'])
     def v7_auth_login():

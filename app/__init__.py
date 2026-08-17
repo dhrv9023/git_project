@@ -97,6 +97,12 @@ def create_app(cfg: AppConfig | None = None) -> Flask:
     flask_app = Flask(__name__)
     CORS(flask_app)
 
+    @flask_app.route("/")
+    def serve_index():
+        from flask import send_from_directory
+        root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        return send_from_directory(root_dir, "index.html")
+
     # Auth (JWT) — must be initialised before any JWT-protected routes
     from app.api.auth_routes import init_jwt
     init_jwt(flask_app)
