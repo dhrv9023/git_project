@@ -281,37 +281,9 @@ def scale_single_feature(value: float, scaler, feature_index: int) -> float:
     row[0, feature_index] = value
     return float(scaler.transform(row)[0, feature_index])
 def fetch_data_yfinance(ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
-    df = yf.download(tickers=ticker, start=start_date, end=end_date, auto_adjust=True, progress=False, group_by='column')
-    if df.empty:
-        raise RuntimeError("No data returned from yfinance. Check ticker or dates.")
-    # Flatten potential MultiIndex columns and select single ticker slice
-    if isinstance(df.columns, pd.MultiIndex):
-        # If last level contains the ticker, slice it
-        try:
-            df = df.xs(ticker, axis=1, level=-1)
-        except Exception:
-            # Fallback: drop all but first level
-            df.columns = ['_'.join([str(x) for x in col if x is not None]) for col in df.columns]
-    # Normalize column names to Title-case expected
-    col_map = {c: c.title() for c in df.columns}
-    df = df.rename(columns=col_map)
-    # Some providers may give 'Adj Close' only; ensure core columns exist
-    if 'Close' not in df.columns and 'Adj Close' in df.columns:
-        df['Close'] = df['Adj Close']
-    required = ['Open', 'High', 'Low', 'Close', 'Volume']
-    missing = [c for c in required if c not in df.columns]
-    if missing:
-        # Try to reconstruct Open/High/Low from Close if absolutely necessary
-        if missing and 'Close' in df.columns:
-            for c in missing:
-                if c != 'Volume':
-                    df[c] = df['Close']
-        # If Volume missing, fill with zeros
-        if 'Volume' in missing:
-            df['Volume'] = 0.0
-    df = df[required]
-    df = df.dropna()
-    return df
+    from app.repositories.market_data_repo import MarketDataRepository
+    repo = MarketDataRepository()
+    return repo.fetch_raw(ticker, start_date, end_date)
 
 
 def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
@@ -1245,9 +1217,8 @@ def create_app():
     trainer        = BackgroundTrainer(registry, store, CFG,
                                       max_workers=CFG.max_worker_threads)
     engine         = InferenceEngine(registry, store, cache, CFG)
-    scheduler      = RetrainingScheduler(registry, trainer, engine, CFG)
-
-    scheduler.start()
+    if getattr(CFG, "environment", "") != "test":
+        scheduler.start()
     log.info("Phase 2 ML infrastructure initialized")
     log.info(f"Model artifacts dir : {CFG.model_artifacts_dir}")
     log.info(f"Registry path       : {CFG.registry_path}")

@@ -80,6 +80,8 @@ TECHNOLOGIES.md
 WEBSITE_PROMPT.md
 WHATS_NEW.md
 
-# ─── Generated one-off scripts (not part of the app) ─────────────────────────
+# ─── Generated one-off scripts & binary reviews ──────────────────────────────
 append_upgrade_guide.py
 generate_review_docx.py
+*.docx
+*.doc

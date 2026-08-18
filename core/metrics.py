@@ -83,9 +83,8 @@ class Histogram:
         self.description = description
         self._buckets    = sorted(buckets or self.DEFAULT_BUCKETS_S) + [math.inf]
         self._label_keys = labels or []
-        # Per label-combo: list of bucket counts + sum + count
         self._data: Dict[tuple, dict] = {}
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def _init_label(self, key: tuple):
         self._data[key] = {

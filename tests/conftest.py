@@ -69,21 +69,36 @@ def engineered_df(synthetic_ohlcv) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+# Global yfinance & repository mock fixture to ensure zero network in tests
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def mock_external_network(monkeypatch):
+    """Globally mock yfinance and data fetchers to guarantee fast, offline tests."""
+    import yfinance as yf
+    import app
+    from app.repositories.market_data_repo import MarketDataRepository
+    
+    monkeypatch.setattr(yf, "download", lambda *args, **kwargs: make_synthetic_ohlcv(300))
+    if hasattr(app, "fetch_data_yfinance"):
+        monkeypatch.setattr(app, "fetch_data_yfinance", lambda *args, **kwargs: make_synthetic_ohlcv(300))
+    monkeypatch.setattr(MarketDataRepository, "fetch_raw", lambda self, ticker, start, end: make_synthetic_ohlcv(300))
+
+
+# ---------------------------------------------------------------------------
 # Flask test client
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="session")
 def test_app(test_cfg):
     """Flask test app with DI-injected test config."""
-    from unittest.mock import MagicMock, patch
+    from unittest.mock import patch
 
-    # Patch yfinance so no real network calls
-    with patch("yfinance.download") as mock_dl:
-        mock_dl.return_value = make_synthetic_ohlcv(300)
+    with patch("yfinance.download", return_value=make_synthetic_ohlcv(300)):
         from app import create_app
         app = create_app(test_cfg)
         app.config["TESTING"] = True
-        yield app
+        return app
 
 
 @pytest.fixture

@@ -64,7 +64,8 @@ def create_app(cfg: AppConfig | None = None) -> Flask:
     raw_trainer = BackgroundTrainer(registry, store, cfg, max_workers=cfg.max_worker_threads)
     engine = InferenceEngine(registry, store, cache, cfg)
     scheduler = RetrainingScheduler(registry, raw_trainer, engine, cfg)
-    scheduler.start()
+    if cfg.environment != "test":
+        scheduler.start()
 
     rate_limiter = RateLimiter(
         burst_capacity=cfg.rate_limit_burst,

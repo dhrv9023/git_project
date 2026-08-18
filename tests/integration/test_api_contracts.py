@@ -70,6 +70,7 @@ class TestRegimeEndpoint:
 
 
 class TestV2TrainEndpoint:
+    @patch("ml.trainer.BackgroundTrainer._run_job", lambda *args, **kwargs: None)
     def test_train_returns_202_with_job_id(self, client):
         resp = client.post(
             "/api/v2/train",
@@ -96,10 +97,11 @@ class TestV2MetricsEndpoint:
 
 
 class TestRateLimiter:
-    @patch("app.repositories.market_data_repo.MarketDataRepository.fetch_raw", _mock_fetch)
+    @patch("app.services.regime_service.RegimeService.classify", lambda *args, **kwargs: MagicMock(to_dict=lambda: {"ticker": "AAPL", "status": "ok"}))
     def test_rate_limit_triggered_after_burst(self, client):
         """Send more POST requests than burst capacity (20). Expect 429."""
         hit_429 = False
+        resp = None
         for _ in range(25):
             resp = client.post(
                 "/api/regime",

@@ -28,6 +28,8 @@ ENV/
 model_artifacts/
 inference_cache/
 StockBuddy_Portfolio_Review.docx
+*.docx
+*.doc
 
 # Documentation & Markdown (optional for container runtime)
 PHASE_*.md
