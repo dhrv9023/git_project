@@ -41,9 +41,10 @@ class AIMarketSynthesizer:
     Falls back to a structured template if GEMINI_API_KEY is not set.
     """
 
-    _gemini_model   = None
-    _gemini_api_key = ""
-    _gemini_ready   = False
+    _gemini_model      = None
+    _gemini_model_name = "gemini-flash-latest"
+    _gemini_api_key    = ""
+    _gemini_ready      = False
 
     @classmethod
     def _init_gemini(cls) -> bool:
@@ -56,10 +57,19 @@ class AIMarketSynthesizer:
         try:
             from google import genai   # type: ignore
             client = genai.Client(api_key=api_key)
-            cls._gemini_model = client.models
             cls._gemini_api_key = api_key
+
+            # Auto-detect best available flash model (avoids version deprecation breakage)
+            preferred = ["gemini-3.1-flash-lite", "gemini-3.1-flash-lite-preview",
+                         "gemini-3.6-flash", "gemini-3-flash-preview",
+                         "gemini-flash-latest", "gemini-2.5-flash"]
+            available = {m.name.split("/")[-1] for m in client.models.list()}
+            cls._gemini_model_name = next(
+                (m for m in preferred if m in available),
+                next((m for m in available if "flash" in m and "preview" not in m), "gemini-flash-latest")
+            )
             cls._gemini_ready = True
-            log.info("[AIMarketSynthesizer] Gemini (google-genai) initialised.")
+            log.info("[AIMarketSynthesizer] Gemini ready — model: %s", cls._gemini_model_name)
             return True
         except ImportError:
             log.warning("[AIMarketSynthesizer] google-genai not installed. Run: pip install google-genai")
@@ -146,7 +156,7 @@ class AIMarketSynthesizer:
         from google import genai   # type: ignore
         client   = genai.Client(api_key=cls._gemini_api_key)
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model=cls._gemini_model_name,
             contents=prompt,
         )
         raw = response.text.strip()
@@ -157,7 +167,7 @@ class AIMarketSynthesizer:
             "headline":          parsed["headline"],
             "executive_summary": parsed["executive_summary"],
             "key_takeaways":     parsed["key_takeaways"],
-            "source":            "gemini-2.0-flash",
+            "source":            f"gemini/{cls._gemini_model_name}",
         }
 
     @staticmethod
