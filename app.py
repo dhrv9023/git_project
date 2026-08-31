@@ -1163,8 +1163,6 @@ def get_condition_alert(risk_score: float, regime_id: int) -> dict:
 # Orchestration
 # --------------------------
 def main():
-    pass
-
     print("\n" + "="*70)
     print("STOCK PRICE PREDICTION WITH DEEP LEARNING")
     print(f"Ticker: {CONFIG['ticker']}")
@@ -1217,6 +1215,10 @@ def create_app():
     trainer        = BackgroundTrainer(registry, store, CFG,
                                       max_workers=CFG.max_worker_threads)
     engine         = InferenceEngine(registry, store, cache, CFG)
+    # BUG-FIX: scheduler must be instantiated before start() is called.
+    # RetrainingScheduler is a daemon thread — it polls registry for stale models
+    # and re-queues training jobs automatically.
+    scheduler      = RetrainingScheduler(registry, trainer, engine, CFG)
     if getattr(CFG, "environment", "") != "test":
         scheduler.start()
     log.info("Phase 2 ML infrastructure initialized")
@@ -1301,7 +1303,7 @@ def create_app():
 
         def safe_scalar(v):
             if v is None: return None
-            if isinstance(v, (float, int)) and isinstance(v, float) and (math.isnan(v) or math.isinf(v)): return None
+            if isinstance(v, float) and (math.isnan(v) or math.isinf(v)): return None
             return v
 
         try:

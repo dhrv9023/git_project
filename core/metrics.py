@@ -39,20 +39,20 @@ class Counter:
     Memory:     O(L) where L = unique label combinations
     """
 
-    def __init__(self, name: str, description: str = "", labels: List[str] = None):
+    def __init__(self, name: str, description: str = "", labels: Optional[List[str]] = None):
         self.name        = name
         self.description = description
-        self._label_keys = labels or []
+        self.label_keys: List[str] = labels or []
         self._values: Dict[tuple, int] = defaultdict(int)
         self._lock = threading.Lock()
 
     def inc(self, amount: int = 1, **label_values):
-        key = tuple(label_values.get(k, "") for k in self._label_keys)
+        key = tuple(label_values.get(k, "") for k in self.label_keys)
         with self._lock:
             self._values[key] += amount
 
     def get(self, **label_values) -> int:
-        key = tuple(label_values.get(k, "") for k in self._label_keys)
+        key = tuple(label_values.get(k, "") for k in self.label_keys)
         with self._lock:
             return self._values[key]
 
@@ -78,55 +78,55 @@ class Histogram:
     DEFAULT_BUCKETS_S = [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 
     def __init__(self, name: str, description: str = "",
-                 buckets: List[float] = None, labels: List[str] = None):
+                 buckets: Optional[List[float]] = None, labels: Optional[List[str]] = None):
         self.name        = name
         self.description = description
-        self._buckets    = sorted(buckets or self.DEFAULT_BUCKETS_S) + [math.inf]
-        self._label_keys = labels or []
-        self._data: Dict[tuple, dict] = {}
+        self.buckets     = sorted(buckets or self.DEFAULT_BUCKETS_S) + [math.inf]
+        self.label_keys: List[str] = labels or []
+        self.data: Dict[tuple, dict] = {}
         self._lock = threading.RLock()
 
     def _init_label(self, key: tuple):
-        self._data[key] = {
-            "buckets": [0] * len(self._buckets),  # cumulative counts per boundary
+        self.data[key] = {
+            "buckets": [0] * len(self.buckets),  # cumulative counts per boundary
             "sum":     0.0,
             "count":   0,
         }
 
     def observe(self, value: float, **label_values):
-        key = tuple(label_values.get(k, "") for k in self._label_keys)
+        key = tuple(label_values.get(k, "") for k in self.label_keys)
         with self._lock:
-            if key not in self._data:
+            if key not in self.data:
                 self._init_label(key)
-            d = self._data[key]
+            d = self.data[key]
             d["sum"]   += value
             d["count"] += 1
-            for i, boundary in enumerate(self._buckets):  # O(B)
+            for i, boundary in enumerate(self.buckets):  # O(B)
                 if value <= boundary:
                     d["buckets"][i] += 1
 
     def percentile(self, p: float, **label_values) -> Optional[float]:
         """Approximate Pxx from bucket counts. O(B)."""
-        key = tuple(label_values.get(k, "") for k in self._label_keys)
+        key = tuple(label_values.get(k, "") for k in self.label_keys)
         with self._lock:
-            if key not in self._data:
+            if key not in self.data:
                 return None
-            d = self._data[key]
+            d = self.data[key]
             total = d["count"]
             if total == 0:
                 return None
             target = p * total
-            for i, boundary in enumerate(self._buckets):
+            for i, boundary in enumerate(self.buckets):
                 if d["buckets"][i] >= target:
                     return boundary
-            return self._buckets[-2]   # last finite bucket
+            return self.buckets[-2]   # last finite bucket
 
     def snapshot(self, **label_values) -> dict:
-        key = tuple(label_values.get(k, "") for k in self._label_keys)
+        key = tuple(label_values.get(k, "") for k in self.label_keys)
         with self._lock:
-            if key not in self._data:
+            if key not in self.data:
                 return {}
-            d = self._data[key]
+            d = self.data[key]
             total = d["count"]
             return {
                 "count": total,
@@ -137,7 +137,7 @@ class Histogram:
                 "p99":   self.percentile(0.99, **label_values),
                 "buckets": {
                     f"le_{b}": d["buckets"][i]
-                    for i, b in enumerate(self._buckets)
+                    for i, b in enumerate(self.buckets)
                     if not math.isinf(b)
                 },
             }
@@ -210,11 +210,11 @@ class MetricsRegistry:
             self._metrics[metric.name] = metric
         return metric
 
-    def counter(self, name: str, description: str = "", labels: List[str] = None) -> Counter:
+    def counter(self, name: str, description: str = "", labels: Optional[List[str]] = None) -> Counter:
         m = Counter(name, description, labels)
         return self.register(m)
 
-    def histogram(self, name: str, description: str = "", labels: List[str] = None) -> Histogram:
+    def histogram(self, name: str, description: str = "", labels: Optional[List[str]] = None) -> Histogram:
         m = Histogram(name, description, labels=labels)
         return self.register(m)
 
@@ -236,7 +236,7 @@ class MetricsRegistry:
             if isinstance(m, Counter):
                 lines.append(f"# TYPE {name} counter")
                 for labels, val in m.snapshot().items():
-                    label_str = _fmt_labels(m._label_keys, labels)
+                    label_str = _fmt_labels(m.label_keys, labels)
                     lines.append(f"{name}{label_str} {val}")
             elif isinstance(m, Gauge):
                 lines.append(f"# TYPE {name} gauge")
@@ -244,9 +244,9 @@ class MetricsRegistry:
             elif isinstance(m, Histogram):
                 lines.append(f"# TYPE {name} histogram")
                 # summary format for simplicity
-                for key in m._data:
-                    snap = m.snapshot(**dict(zip(m._label_keys, key)))
-                    label_str = _fmt_labels(m._label_keys, key)
+                for key in m.data:
+                    snap = m.snapshot(**dict(zip(m.label_keys, key)))
+                    label_str = _fmt_labels(m.label_keys, key)
                     if snap:
                         lines.append(f"{name}_count{label_str} {snap['count']}")
                         lines.append(f"{name}_sum{label_str} {snap['sum']}")
@@ -254,7 +254,7 @@ class MetricsRegistry:
                             v = snap.get(p)
                             if v is not None:
                                 if label_str:
-                                    ql = label_str.rstrip("}") + f',quantile="{q}"}}'
+                                     ql = label_str.rstrip("}") + f',quantile="{q}"}}'
                                 else:
                                     ql = f'{{quantile="{q}"}}'
                                 lines.append(f"{name}{ql} {v}")
@@ -271,8 +271,8 @@ class MetricsRegistry:
                     result[name] = {"type": "gauge", "value": m.get()}
                 elif isinstance(m, Histogram):
                     snaps = {}
-                    for key in m._data:
-                        snaps[str(key)] = m.snapshot(**dict(zip(m._label_keys, key)))
+                    for key in m.data:
+                        snaps[str(key)] = m.snapshot(**dict(zip(m.label_keys, key)))
                     result[name] = {"type": "histogram", "snapshots": snaps}
         return result
 
