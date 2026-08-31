@@ -85,3 +85,20 @@ append_upgrade_guide.py
 generate_review_docx.py
 *.docx
 *.doc
+
+# ─── Phase & planning documentation (local only, not for public repo) ─────────
+# These are internal engineering phase docs and planning artifacts.
+# They live on disk but are excluded from git to keep the repo clean.
+PHASE_1_STATISTICAL_CORRECTIONS.md
+PHASE_2_PRODUCTION_PIPELINE.md
+PHASE_3_DISTRIBUTED_SCALE.md
+PHASE_4_UI_UX_DESIGN.md
+PHASE_5_QUANT_RESEARCH.md
+PHASE_6_DEPLOYMENT.md
+PHASE_7_AI_PLATFORM_PRD.md
+PROJECT_SUMMARY.md
+STOCKBUDDY_STAFF_ENGINEER_PORTFOLIO_KIT.md
+
+# ─── Tool configuration (local only) ─────────────────────────────────────────
+.pyre_configuration
+.vscode/
