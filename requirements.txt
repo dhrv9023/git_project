@@ -27,6 +27,9 @@ bcrypt>=5.0.0
 # NLP / Sentiment Analysis
 vaderSentiment>=3.3.2
 
+# AI / LLM Integration (Google Gemini)
+google-genai>=1.0.0
+
 # HTTP & Utilities
 requests>=2.31.0
 
