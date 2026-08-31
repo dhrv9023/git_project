@@ -30,6 +30,3 @@ vaderSentiment>=3.3.2
 # HTTP & Utilities
 requests>=2.31.0
 
-# Testing & Quality Assurance (Dev / CI)
-pytest>=7.4.0
-pyflakes>=3.1.0

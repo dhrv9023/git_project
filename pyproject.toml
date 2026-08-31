@@ -62,6 +62,8 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "unit: fast, no I/O (deselect with '-m not unit')",
     "integration: uses Flask test client",

@@ -24,4 +24,6 @@ services:
       - key: SB_MAX_WORKER_THREADS
         value: 2
       - key: SENTRY_DSN
-        sync: false  # Add in Render dashboard
+        sync: false  # Optional: add in Render dashboard
+      - key: SB_JWT_SECRET
+        sync: false  # REQUIRED: generate with python -c "import secrets; print(secrets.token_hex(32))"
