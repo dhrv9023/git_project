@@ -1706,7 +1706,10 @@ def create_app():
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data:; "
                 "img-src 'self' data: https:; "
-                "style-src 'self' 'unsafe-inline' https:;"
+                "style-src 'self' 'unsafe-inline' https:; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; "
+                "font-src 'self' https: data:; "
+                "connect-src 'self' https: wss:;"
             )
             if not CFG.debug and getattr(CFG, "environment", "") in ("production", "staging"):
                 response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

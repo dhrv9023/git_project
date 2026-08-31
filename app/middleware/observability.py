@@ -46,5 +46,12 @@ def register_observability(app: Flask, rate_limiter) -> None:
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         if "Content-Security-Policy" not in response.headers:
-            response.headers["Content-Security-Policy"] = "default-src 'self'"
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data:; "
+                "img-src 'self' data: https:; "
+                "style-src 'self' 'unsafe-inline' https:; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; "
+                "font-src 'self' https: data:; "
+                "connect-src 'self' https: wss:;"
+            )
         return response
